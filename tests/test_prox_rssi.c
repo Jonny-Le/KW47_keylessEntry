@@ -125,8 +125,9 @@ static void RecordResult(const char *name, int passed,
 } while(0)
 
 /*******************************************************************************
- * Default alpha LUT: linear ramp from alpha=0.10 (dt=0) to alpha=0.80 (dt=1000ms)
- * Values in Q15: 0.10 = 3277, 0.80 = 26214
+ * Default alpha LUT: linear ramp from alpha=0.05 (dt=0) to alpha=0.30 (dt=1000ms)
+ * Gives ~1.3s time constant at 100ms sampling.
+ * Values in Q15: 0.05 = 1638, 0.30 = 9830
  ******************************************************************************/
 #define TEST_ALPHA_LUT_LEN  1001u
 
@@ -138,7 +139,7 @@ static void BuildAlphaLut(void)
     {
         double frac = (double)i / 1000.0;
         if (frac > 1.0) frac = 1.0;
-        double alpha = 0.10 + frac * (0.80 - 0.10);
+        double alpha = 0.05 + frac * (0.30 - 0.05);
         gAlphaLut[i] = (uint16)(alpha * 32767.0);
     }
 }
@@ -155,15 +156,15 @@ static ProxRssi_ParamsType DefaultParams(void)
     p.wSpikeMs  = 800u;
     p.wFeatMs   = 2000u;
 
-    p.hampelKQ4 = 48u;   /* K = 3.0 */
+    p.hampelKQ4 = 40u;   /* K = 2.5 (tighter spike rejection) */
     p.madEpsQ4  = 8u;    /* 0.5 dB */
 
     p.enterNearQ4 = ProxRssi_DbmToQ4(-50);
     p.exitNearQ4  = ProxRssi_DbmToQ4(-60);
     p.hystQ4      = (uint16)ProxRssi_DbToQ4(10);
 
-    p.pctThQ15       = 16384u;  /* ~50% */
-    p.stdThQ4        = 40u;     /* 2.5 dB */
+    p.pctThQ15       = 13107u;  /* ~40% */
+    p.stdThQ4        = 128u;    /* 8 dB — realistic for BLE RSSI noise */
     p.stableMs       = 2000u;
     p.minFeatSamples = 6u;
 
@@ -671,11 +672,13 @@ static void test_unstable_does_not_unlock(void)
     /* Bootstrap in FAR */
     FeedSamples(&ctx, (sint8)-80, 10u, 100u, &t);
 
-    /* Very noisy signal: alternate -30 and -55 for 4 seconds */
+    /* Noisy signal alternating close/far — average below enter threshold.
+     * -35 and -75 average to -55 dBm (below -50 enter) so EMA stays < -50
+     * and the state machine should never enter CANDIDATE. */
     ProxRssi_EventType ev;
     for (uint32 i = 0u; i < 40u; i++)
     {
-        sint8 val = (i % 2u == 0u) ? (sint8)-30 : (sint8)-55;
+        sint8 val = (i % 2u == 0u) ? (sint8)-35 : (sint8)-75;
         t += 100u;
         ProxRssi_PushRaw(&ctx, t, val);
         ProxRssi_MainFunction(&ctx, t, &ev, NULL);

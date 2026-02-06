@@ -95,15 +95,15 @@ void RssiIntegration_Init(void)
     params.wSpikeMs  = 800u;
     params.wFeatMs   = 2000u;
 
-    params.hampelKQ4 = 48u;   /* K = 3.0 */
+    params.hampelKQ4 = 40u;   /* K = 2.5 (tighter spike rejection) */
     params.madEpsQ4  = 8u;    /* 0.5 dB floor */
 
     params.enterNearQ4 = ProxRssi_DbmToQ4((sint8)-50);
     params.exitNearQ4  = ProxRssi_DbmToQ4((sint8)-60);
     params.hystQ4      = (uint16)ProxRssi_DbToQ4((sint16)10);
 
-    params.pctThQ15       = 16384u;  /* ~50% */
-    params.stdThQ4        = 40u;     /* 2.5 dB */
+    params.pctThQ15       = 13107u;  /* ~40% of smoothed samples above enter */
+    params.stdThQ4        = 128u;    /* 8 dB — realistic for BLE RSSI noise */
     params.stableMs       = 2000u;
     params.minFeatSamples = 6u;
 
@@ -369,13 +369,15 @@ void RssiIntegration_StopMonitoring(void)
 
 static void RssiIntegration_BuildAlphaLut(void)
 {
-    /* Linear ramp: alpha = 0.10 at dt=0ms, alpha = 0.80 at dt=1000ms
-     * Q15: 0.10 = 3277, 0.80 = 26214 */
+    /* Linear ramp: alpha = 0.05 at dt=0ms, alpha = 0.30 at dt=1000ms
+     * Gives ~1.3s time constant at 100ms sampling — smooth enough to
+     * suppress BLE RSSI jitter while still tracking movement.
+     * Q15: 0.05 = 1638, 0.30 = 9830 */
     uint32 i;
     for (i = 0u; i < RSSI_ALPHA_LUT_LEN; i++)
     {
-        /* alpha_q15 = 3277 + i * (26214 - 3277) / 1000 */
-        uint32 alpha = 3277u + ((i * 22937u) / 1000u);
+        /* alpha_q15 = 1638 + i * (9830 - 1638) / 1000 */
+        uint32 alpha = 1638u + ((i * 8192u) / 1000u);
         if (alpha > 32767u) { alpha = 32767u; }
         gAlphaLutQ15[i] = (uint16)alpha;
     }
