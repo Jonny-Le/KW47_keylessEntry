@@ -291,14 +291,25 @@ static void test_push_raw_clamping(void)
 
     /* Should not crash with extreme values */
     Std_ReturnType r;
-    r = ProxRssi_PushRaw(&ctx, 100u, (sint8)20);
-    TEST_ASSERT(r == E_OK, "Push +20 succeeds");
+    r = ProxRssi_PushRaw(&ctx, 100u, (sint8)-50);
+    TEST_ASSERT(r == E_OK, "Push -50 succeeds");
     r = ProxRssi_PushRaw(&ctx, 200u, (sint8)-127);
     TEST_ASSERT(r == E_OK, "Push -127 succeeds");
     r = ProxRssi_PushRaw(NULL, 300u, (sint8)-50);
     TEST_ASSERT(r == E_NOT_OK, "Push NULL ctx returns E_NOT_OK");
 
-    TEST_PASS("PushRaw clamping");
+    /* BLE Core Spec: RSSI 127 = "not available", reject non-negative */
+    r = ProxRssi_PushRaw(&ctx, 400u, (sint8)127);
+    TEST_ASSERT(r == E_NOT_OK, "Push 127 (not available) rejected");
+    r = ProxRssi_PushRaw(&ctx, 500u, (sint8)0);
+    TEST_ASSERT(r == E_NOT_OK, "Push 0 (non-negative) rejected");
+    r = ProxRssi_PushRaw(&ctx, 600u, (sint8)20);
+    TEST_ASSERT(r == E_NOT_OK, "Push +20 (non-negative) rejected");
+
+    /* Only the two valid pushes should be in the buffer */
+    TEST_ASSERT(ctx.raw.count == 2u, "Only valid samples in buffer");
+
+    TEST_PASS("PushRaw clamping + validation");
 }
 
 /*******************************************************************************

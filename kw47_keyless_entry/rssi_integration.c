@@ -178,6 +178,14 @@ void RssiIntegration_UpdateRssi(uint8_t deviceId, int8_t rssi)
         return;
     }
 
+    /* BLE Core Spec: RSSI 127 (0x7F) = "not available". Also reject >= 0
+     * since real BLE RSSI is always negative. Feeding these into the
+     * pipeline poisons the Hampel median and corrupts the state machine. */
+    if ((rssi == (int8_t)127) || (rssi >= (int8_t)0))
+    {
+        return;
+    }
+
     nowMs = RssiIntegration_GetTimestampMs();
 
     (void)ProxRssi_PushRaw(&gProxCtx, (uint32)nowMs, (sint8)rssi);

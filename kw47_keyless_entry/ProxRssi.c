@@ -494,9 +494,14 @@ Std_ReturnType ProxRssi_PushRaw(ProxRssi_CtxType* Ctx, uint32 tMs, sint8 rssiDbm
 {
   if (Ctx == NULL_PTR) { return E_NOT_OK; }
 
-  /* clamp */
+  /* BLE Core Spec: 127 (0x7F) = "not available"; reject non-negative too */
+  if ((rssiDbm == (sint8)127) || (rssiDbm >= (sint8)0))
+  {
+    return E_NOT_OK;
+  }
+
+  /* clamp to valid BLE range */
   if (rssiDbm < (sint8)-127) { rssiDbm = (sint8)-127; }
-  if (rssiDbm > (sint8)20)   { rssiDbm = (sint8)20; }
 
   ProxRssi_RawPush(Ctx, tMs, rssiDbm);
   return E_OK;
