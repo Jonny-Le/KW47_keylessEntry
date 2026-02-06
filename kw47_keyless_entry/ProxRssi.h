@@ -39,29 +39,10 @@
 ===============================================================================
 */
 
-#include <stdint.h>
-
-/* ---------------- AUTOSAR-like basic types (portable) ----------------
- * These short names (uint8, sint16, …) are NOT in NXP EmbeddedTypes.h,
- * so we always typedef them here. TRUE/FALSE/boolean are guarded to
- * coexist with EmbeddedTypes.h which defines them differently.
- * -------------------------------------------------------------------- */
-typedef uint8_t  uint8;
-typedef int8_t   sint8;
-typedef uint16_t uint16;
-typedef int16_t  sint16;
-typedef uint32_t uint32;
-typedef int32_t  sint32;
-typedef int64_t  sint64;
-
-typedef uint8    boolean;
-#ifndef TRUE
-#define TRUE       1
-#define FALSE      0
-#endif
+#include "EmbeddedTypes.h"
 
 #ifndef E_OK
-typedef uint8 Std_ReturnType;
+typedef uint8_t Std_ReturnType;
 #define E_OK       ((Std_ReturnType)0u)
 #define E_NOT_OK   ((Std_ReturnType)1u)
 #endif
@@ -73,7 +54,7 @@ typedef uint8 Std_ReturnType;
 
 /* ---------------- Compile-time configuration ---------------- */
 #ifndef PROX_RSSI_RAW_CAP
-#define PROX_RSSI_RAW_CAP     (128u)
+#define PROX_RSSI_RAW_CAP     (64u)
 #endif
 
 #ifndef PROX_RSSI_SMOOTH_CAP
@@ -84,7 +65,13 @@ typedef uint8 Std_ReturnType;
 #define PROX_RSSI_ALPHA_LUT_MAX_MS (1000u)
 #endif
 
-#define PROX_RSSI_Q4_SCALE          ((sint16)16)
+#ifndef PROX_RSSI_ALPHA_LUT_STEP_MS
+#define PROX_RSSI_ALPHA_LUT_STEP_MS (16u)
+#endif
+
+#define PROX_RSSI_ALPHA_LUT_SIZE ((PROX_RSSI_ALPHA_LUT_MAX_MS / PROX_RSSI_ALPHA_LUT_STEP_MS) + 1u)
+
+#define PROX_RSSI_Q4_SCALE          ((int16_t)16)
 #define PROX_RSSI_Q15_ONE           (32767u)
 
 /* ---------------- Public types ---------------- */
@@ -106,57 +93,57 @@ typedef enum
 typedef struct
 {
   /* Windows (ms) */
-  uint32 wRawMs;         /* e.g. 2000 */
-  uint32 wSpikeMs;       /* e.g. 800  */
-  uint32 wFeatMs;        /* e.g. 2000 */
+  uint32_t wRawMs;         /* e.g. 2000 */
+  uint32_t wSpikeMs;       /* e.g. 800  */
+  uint32_t wFeatMs;        /* e.g. 2000 */
 
   /* Hampel spike rejection: threshold = K * 1.5 * MAD */
-  uint16 hampelKQ4;      /* e.g. 3.0 => 48 */
-  uint16 madEpsQ4;       /* floor MAD, e.g. 0.5 => 8 */
+  uint16_t hampelKQ4;      /* e.g. 3.0 => 48 */
+  uint16_t madEpsQ4;       /* floor MAD, e.g. 0.5 => 8 */
 
   /* Thresholds (Q4 dB) */
-  sint16 enterNearQ4;    /* calibrated */
-  sint16 exitNearQ4;     /* if 0, derived */
-  uint16 hystQ4;         /* e.g. 5 dB => 80 */
+  int16_t enterNearQ4;    /* calibrated */
+  int16_t exitNearQ4;     /* if 0, derived */
+  uint16_t hystQ4;         /* e.g. 5 dB => 80 */
 
   /* Stability gate */
-  uint16 pctThQ15;       /* e.g. 0.80 => 26214 */
-  uint16 stdThQ4;        /* e.g. 2.5 dB => 40 */
-  uint32 stableMs;       /* e.g. 2000 */
-  uint16 minFeatSamples; /* e.g. 6 */
+  uint16_t pctThQ15;       /* e.g. 0.80 => 26214 */
+  uint16_t stdThQ4;        /* e.g. 2.5 dB => 40 */
+  uint32_t stableMs;       /* e.g. 2000 */
+  uint16_t minFeatSamples; /* e.g. 6 */
 
   /* State machine */
-  uint32 exitConfirmMs;  /* e.g. 1500 */
-  uint32 lockoutMs;      /* e.g. 7000 */
+  uint32_t exitConfirmMs;  /* e.g. 1500 */
+  uint32_t lockoutMs;      /* e.g. 7000 */
 
   /* Time anomaly handling */
-  uint32 maxReasonableDtMs; /* e.g. 2000; if dt > this => full reset */
+  uint32_t maxReasonableDtMs; /* e.g. 2000; if dt > this => full reset */
 } ProxRssi_ParamsType;
 
 typedef struct
 {
-  uint16 n;
-  uint16 pctAboveEnterQ15;
-  uint16 stdQ4;
-  sint16 lastQ4;
-  sint16 minQ4;
-  sint16 maxQ4;
+  uint16_t n;
+  uint16_t pctAboveEnterQ15;
+  uint16_t stdQ4;
+  int16_t lastQ4;
+  int16_t minQ4;
+  int16_t maxQ4;
 } ProxRssi_FeaturesType;
 
 typedef struct
 {
-  uint32 tMs[PROX_RSSI_RAW_CAP];
-  sint8  rssiDbm[PROX_RSSI_RAW_CAP];
-  uint16 head;
-  uint16 count;
+  uint32_t tMs[PROX_RSSI_RAW_CAP];
+  int8_t  rssiDbm[PROX_RSSI_RAW_CAP];
+  uint16_t head;
+  uint16_t count;
 } ProxRssi_RawBufType;
 
 typedef struct
 {
-  uint32 tMs[PROX_RSSI_SMOOTH_CAP];
-  sint16 rssiQ4[PROX_RSSI_SMOOTH_CAP];
-  uint16 head;
-  uint16 count;
+  uint32_t tMs[PROX_RSSI_SMOOTH_CAP];
+  int16_t rssiQ4[PROX_RSSI_SMOOTH_CAP];
+  uint16_t head;
+  uint16_t count;
 } ProxRssi_SmoothBufType;
 
 typedef struct
@@ -164,38 +151,38 @@ typedef struct
   ProxRssi_ParamsType p;
   ProxRssi_StateType  st;
 
-  uint32 tCandidateStartMs;
-  uint32 tBelowExitStartMs;
-  uint32 tLockoutUntilMs;
+  uint32_t tCandidateStartMs;
+  uint32_t tBelowExitStartMs;
+  uint32_t tLockoutUntilMs;
 
-  boolean emaValid;
-  sint16 emaQ4;
-  uint32 emaPrevMs;
+  bool_t emaValid;
+  int16_t emaQ4;
+  uint32_t emaPrevMs;
 
   ProxRssi_RawBufType    raw;
   ProxRssi_SmoothBufType smooth;
 
-  uint16 alphaQ15[PROX_RSSI_ALPHA_LUT_MAX_MS + 1u];
+  uint16_t alphaQ15[PROX_RSSI_ALPHA_LUT_SIZE];
 
   /* Temp arrays (no malloc) */
-  sint16 tmpA[PROX_RSSI_RAW_CAP];
-  sint16 tmpB[PROX_RSSI_RAW_CAP];
-  sint16 tmpS[PROX_RSSI_SMOOTH_CAP];
+  int16_t tmpA[PROX_RSSI_RAW_CAP];
+  int16_t tmpB[PROX_RSSI_RAW_CAP];
+  int16_t tmpS[PROX_RSSI_SMOOTH_CAP];
 } ProxRssi_CtxType;
 
 /* Helpers */
-sint16 ProxRssi_DbmToQ4(sint8 dbm);
-sint16 ProxRssi_DbToQ4(sint16 db);
+int16_t ProxRssi_DbmToQ4(int8_t dbm);
+int16_t ProxRssi_DbToQ4(int16_t db);
 
 /* API */
 Std_ReturnType ProxRssi_Init(ProxRssi_CtxType* Ctx,
                             const ProxRssi_ParamsType* Params,
-                            const uint16* AlphaQ15Lut,
-                            uint32 AlphaLutLen);
+                            const uint16_t* AlphaQ15Lut,
+                            uint32_t AlphaLutLen);
 
-Std_ReturnType ProxRssi_PushRaw(ProxRssi_CtxType* Ctx, uint32 tMs, sint8 rssiDbm);
+Std_ReturnType ProxRssi_PushRaw(ProxRssi_CtxType* Ctx, uint32_t tMs, int8_t rssiDbm);
 
-Std_ReturnType ProxRssi_MainFunction(ProxRssi_CtxType* Ctx, uint32 nowMs,
+Std_ReturnType ProxRssi_MainFunction(ProxRssi_CtxType* Ctx, uint32_t nowMs,
                                      ProxRssi_EventType* Event,
                                      ProxRssi_FeaturesType* Features);
 
