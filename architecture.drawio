@@ -1,0 +1,196 @@
+<mxfile host="app.diagrams.net" modified="2026-02-06T04:27:00.000Z" agent="Cascade" version="21.0.0">
+  <diagram id="rssi-architecture" name="RSSI Filter Architecture">
+    <mxGraphModel dx="1500" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ==================== TITLE ==================== -->
+        <mxCell id="title" value="KW47 Keyless Entry — RSSI Filtering Architecture (Q4 Pipeline)" style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="350" y="15" width="700" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== HARDWARE LAYER ==================== -->
+        <mxCell id="hw_group" value="Hardware Layer" style="swimlane;startSize=30;fontSize=14;fontStyle=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="300" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="kw47" value="KW47B42ZB7 MCU&#xa;(Cortex-M33)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;" vertex="1" parent="hw_group">
+          <mxGeometry x="70" y="40" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ble_radio" value="BLE 6.0 Radio&#xa;+ Antenna" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="hw_group">
+          <mxGeometry x="20" y="120" width="120" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="serial" value="USB Serial&#xa;(VCOM)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="hw_group">
+          <mxGeometry x="160" y="120" width="120" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== EXTERNAL DEVICES ==================== -->
+        <mxCell id="phone" value="iPhone&#xa;(nRF Connect)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="360" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pc" value="PC Terminal&#xa;(screen 115200)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="220" y="360" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== BLE STACK LAYER ==================== -->
+        <mxCell id="ble_group" value="BLE Stack (NXP SDK)" style="swimlane;startSize=30;fontSize=14;fontStyle=1;fillColor=#f8cecc;strokeColor=#b85450;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="80" width="280" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="gap" value="GAP Interface&#xa;Gap_ReadRssi()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="ble_group">
+          <mxGeometry x="20" y="40" width="240" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="conn_cb" value="Connection Callback — gConnEvtRssiRead_c" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="ble_group">
+          <mxGeometry x="20" y="95" width="240" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== APPLICATION LAYER ==================== -->
+        <mxCell id="app_group" value="Application Layer" style="swimlane;startSize=30;fontSize=14;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="270" width="280" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="dk_app" value="digital_key_car_anchor_cs.c&#xa;BleApp_ConnectionCallback()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="app_group">
+          <mxGeometry x="20" y="40" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="shell_cmd" value="shell_digital_key_car_anchor_cs.c&#xa;rssi / rssistop commands" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="app_group">
+          <mxGeometry x="20" y="110" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== RSSI INTEGRATION LAYER ==================== -->
+        <mxCell id="integration_group" value="RSSI Integration Layer" style="swimlane;startSize=30;fontSize=14;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="750" y="80" width="300" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="rssi_int" value="rssi_integration.c&#xa;&#xa;• Init / Connect / Disconnect&#xa;• UpdateRssi() → AddMeasurement()&#xa;• Diagnostics (every 5 samples)&#xa;• Event-based state change print" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="integration_group">
+          <mxGeometry x="20" y="40" width="260" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== RSSI FILTER MODULE ==================== -->
+        <mxCell id="filter_group" value="RSSI Filter Module (rssi_filter.c / .h)" style="swimlane;startSize=30;fontSize=14;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="750" y="320" width="300" height="420" as="geometry" />
+        </mxCell>
+        <mxCell id="hampel" value="Stage 1: Hampel Filter&#xa;Outlier rejection via Median + MAD&#xa;Window: 800 ms, K = 3.0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="filter_group">
+          <mxGeometry x="20" y="45" width="260" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ema" value="Stage 2: Adaptive EMA&#xa;Time-scaled alpha (Q15)&#xa;Alpha: 0.10 – 0.80, Reset if dt &gt; 2 s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="filter_group">
+          <mxGeometry x="20" y="125" width="260" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="features" value="Stage 3: Feature Extraction&#xa;2 s window: StdDev (Q4), PctAbove (Q15)&#xa;Min, Max, Mean" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="filter_group">
+          <mxGeometry x="20" y="205" width="260" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="state_machine" value="Stage 4: State Machine&#xa;&#xa;IDLE → FAR  (first sample)&#xa;FAR → CANDIDATE  (filtered ≥ −60 dBm)&#xa;CANDIDATE → UNLOCK  (stable 2 s)&#xa;Exit confirm: 1.5 s below −70 dBm&#xa;Post-unlock lockout: 5 s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="filter_group">
+          <mxGeometry x="20" y="285" width="260" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Filter internal arrows (left-anchored to avoid overlap with external arrows) -->
+        <mxCell id="f_flow1" value="" style="endArrow=classic;html=1;fontSize=10;strokeWidth=1;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="filter_group" source="hampel" target="ema">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f_flow2" value="" style="endArrow=classic;html=1;fontSize=10;strokeWidth=1;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="filter_group" source="ema" target="features">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f_flow3" value="" style="endArrow=classic;html=1;fontSize=10;strokeWidth=1;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="filter_group" source="features" target="state_machine">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== PROXIMITY STATE MACHINE ==================== -->
+        <mxCell id="prox_group" value="Proximity State Machine" style="swimlane;startSize=30;fontSize=14;fontStyle=1;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="320" width="280" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="prox_states" value="States:&#xa;&#xa;• Disconnected&#xa;• Monitoring&#xa;• Approach&#xa;• Ranging (future CS)&#xa;• Proximity&#xa;• Unlock&#xa;• Locked" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="prox_group">
+          <mxGeometry x="20" y="40" width="240" height="175" as="geometry" />
+        </mxCell>
+        <mxCell id="unlock_output" value="UNLOCK CONDITION" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#60a917;fontColor=#ffffff;strokeColor=#2D7600;fontSize=13;fontStyle=1;" vertex="1" parent="prox_group">
+          <mxGeometry x="50" y="235" width="180" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== UNIT TESTS ==================== -->
+        <mxCell id="test_group" value="Unit Tests (Host)" style="swimlane;startSize=25;fontSize=12;fontStyle=1;fillColor=#f0f0f0;strokeColor=#999999;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="660" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="tests" value="test_rssi_filter.c&#xa;25 tests | JUnit XML | Log file&#xa;Mocks: EmbeddedTypes, TimerMgr" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#999999;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="test_group">
+          <mxGeometry x="20" y="35" width="240" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== LEGEND ==================== -->
+        <mxCell id="legend" value="Legend" style="swimlane;startSize=25;fontSize=12;fontStyle=1;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="80" width="280" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="Hardware" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="15" y="35" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="BLE Stack" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="110" y="35" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="Application" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="15" y="70" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="Integration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="110" y="70" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" value="Filter (Q4)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="15" y="105" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6" value="Prox SM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="110" y="105" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg7" value="Tests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#999999;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="15" y="140" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg8" value="── Data flow&#xa;- - Command/trigger" style="text;html=1;fontSize=10;align=left;" vertex="1" parent="legend">
+          <mxGeometry x="110" y="140" width="160" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== DATA FLOW ARROWS ==================== -->
+
+        <!-- Phone <-> BLE Radio -->
+        <mxCell id="ble_arrow" value="BLE (RSSI)" style="endArrow=classic;startArrow=classic;html=1;fontSize=11;strokeWidth=2;strokeColor=#9673a6;exitX=0.5;exitY=0;entryX=0.25;entryY=1;" edge="1" parent="1" source="phone" target="hw_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- PC <-> Serial -->
+        <mxCell id="serial_arrow" value="Serial" style="endArrow=classic;startArrow=classic;html=1;fontSize=11;strokeWidth=2;strokeColor=#d6b656;exitX=0.5;exitY=0;entryX=0.75;entryY=1;" edge="1" parent="1" source="pc" target="hw_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- HW -> BLE Stack -->
+        <mxCell id="flow9" value="" style="endArrow=classic;html=1;fontSize=11;strokeWidth=2;exitX=1;exitY=0.3;entryX=0;entryY=0.5;" edge="1" parent="1" source="hw_group" target="ble_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- BLE Stack -> App Layer -->
+        <mxCell id="flow1" value="RSSI event" style="endArrow=classic;html=1;fontSize=11;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="ble_group" target="app_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- App -> Integration -->
+        <mxCell id="flow2" value="UpdateRssi(id, rssi)" style="endArrow=classic;html=1;fontSize=11;strokeWidth=2;exitX=1;exitY=0.25;entryX=0;entryY=0.75;" edge="1" parent="1" source="app_group" target="integration_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Shell -> Integration (dashed) -->
+        <mxCell id="flow3" value="Start / Stop" style="endArrow=classic;html=1;fontSize=11;strokeWidth=2;dashed=1;exitX=1;exitY=0.75;entryX=0;entryY=1;" edge="1" parent="1" source="app_group" target="integration_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Integration -> Filter -->
+        <mxCell id="flow4" value="Raw RSSI (dBm)" style="endArrow=classic;html=1;fontSize=11;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="integration_group" target="filter_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Integration -> GAP (dashed, timer read) -->
+        <mxCell id="flow8" value="Gap_ReadRssi()&#xa;(~100 ms polling)" style="endArrow=classic;html=1;fontSize=11;strokeWidth=2;dashed=1;strokeColor=#b85450;exitX=0;exitY=0.25;entryX=1;entryY=0.25;" edge="1" parent="1" source="integration_group" target="ble_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Filter -> Proximity SM -->
+        <mxCell id="flow7" value="State + Event + Filtered RSSI" style="endArrow=classic;html=1;fontSize=11;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="filter_group" target="prox_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Tests -> Filter (dashed) -->
+        <mxCell id="test_arrow" value="tests" style="endArrow=classic;html=1;fontSize=10;strokeWidth=1;dashed=1;strokeColor=#999999;exitX=0;exitY=0.5;entryX=1;entryY=0.85;" edge="1" parent="1" source="test_group" target="filter_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

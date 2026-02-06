@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="rssi_filter" tests="25" failures="0">
+    <testcase name="test_init_defaults">
+    </testcase>
+    <testcase name="test_reset_clears_all">
+    </testcase>
+    <testcase name="test_null_safety">
+    </testcase>
+    <testcase name="test_hampel_rejects_spike">
+    </testcase>
+    <testcase name="test_hampel_passes_clean">
+    </testcase>
+    <testcase name="test_ema_converges">
+    </testcase>
+    <testcase name="test_ema_smooths_noise">
+    </testcase>
+    <testcase name="test_ema_anomaly_reset">
+    </testcase>
+    <testcase name="test_features_stable_signal">
+    </testcase>
+    <testcase name="test_features_noisy_signal">
+    </testcase>
+    <testcase name="test_idle_to_far">
+    </testcase>
+    <testcase name="test_far_to_candidate">
+    </testcase>
+    <testcase name="test_candidate_to_unlock">
+    </testcase>
+    <testcase name="test_candidate_exit_confirm">
+    </testcase>
+    <testcase name="test_exit_confirm_resets">
+    </testcase>
+    <testcase name="test_lockout_period">
+    </testcase>
+    <testcase name="test_lockout_expires_then_locks">
+    </testcase>
+    <testcase name="test_no_flipflop_hysteresis">
+    </testcase>
+    <testcase name="test_unstable_does_not_unlock">
+    </testcase>
+    <testcase name="test_events_emitted">
+    </testcase>
+    <testcase name="test_state_changed_flag">
+    </testcase>
+    <testcase name="test_get_features_null_outputs">
+    </testcase>
+    <testcase name="test_input_clamping">
+    </testcase>
+    <testcase name="test_full_lifecycle">
+    </testcase>
+    <testcase name="test_rapid_samples">
+    </testcase>
+  </testsuite>
+</testsuites>
