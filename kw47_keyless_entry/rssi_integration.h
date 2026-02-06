@@ -84,6 +84,36 @@ void RssiIntegration_StartMonitoring(void);
 ********************************************************************************** */
 void RssiIntegration_StopMonitoring(void);
 
+/*! *********************************************************************************
+* \brief     Get current RSSI EMA value (Q4 format)
+* \return    Current EMA RSSI in Q4 format (divide by 16 for dB)
+********************************************************************************** */
+int16_t RssiIntegration_GetEmaQ4(void);
+
+/*! *********************************************************************************
+* \brief     Get current RSSI standard deviation (Q4 format)
+* \return    Standard deviation in Q4 format
+********************************************************************************** */
+uint16_t RssiIntegration_GetStdQ4(void);
+
+/*! *********************************************************************************
+* \brief     Get percentage of samples above enter threshold (Q15 format)
+* \return    Percentage in Q15 format (0..32767 = 0%..100%)
+********************************************************************************** */
+uint16_t RssiIntegration_GetPctAboveEnterQ15(void);
+
+/*! *********************************************************************************
+* \brief     Get current RSSI state name
+* \return    Pointer to state string ("FAR", "CANDIDATE", "LOCKOUT")
+********************************************************************************** */
+const char* RssiIntegration_GetStateName(void);
+
+/*! *********************************************************************************
+* \brief     Get number of samples in feature window
+* \return    Sample count
+********************************************************************************** */
+uint16_t RssiIntegration_GetSampleCount(void);
+
 #ifdef __cplusplus
 }
 #endif

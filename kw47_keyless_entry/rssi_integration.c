@@ -14,6 +14,7 @@
 ************************************************************************************/
 
 #include "EmbeddedTypes.h"
+#include <stdint.h>
 #include "fsl_component_timer_manager.h"
 #include "rssi_integration.h"
 #include "ProxRssi.h"
@@ -55,7 +56,7 @@ static TIMER_MANAGER_HANDLE_DEFINE(gRssiTimerHandle);
 static bool_t gRssiTimerInitialized = FALSE;
 
 /* Alpha LUT (pre-computed at init): linear ramp 0.10..0.80 over 0..1000 ms */
-static uint16 gAlphaLutQ15[RSSI_ALPHA_LUT_LEN];
+static uint16_t gAlphaLutQ15[RSSI_ALPHA_LUT_LEN];
 
 /************************************************************************************
 * Private function prototypes
@@ -75,7 +76,7 @@ static uint32_t RssiIntegration_GetTimestampMs(void);
 void RssiIntegration_Init(void)
 {
     ProxRssi_ParamsType params;
-    uint32 i;
+    uint32_t i;
 
     if (gRssiIntegrationInitialized == TRUE)
     {
@@ -86,9 +87,9 @@ void RssiIntegration_Init(void)
     RssiIntegration_BuildAlphaLut();
 
     /* Zero-init params */
-    for (i = 0u; i < (uint32)(sizeof(params)); i++)
+    for (i = 0u; i < (uint32_t)(sizeof(params)); i++)
     {
-        ((uint8 *)&params)[i] = 0u;
+        ((uint8_t *)&params)[i] = 0u;
     }
 
     params.wRawMs    = 2000u;
@@ -98,9 +99,9 @@ void RssiIntegration_Init(void)
     params.hampelKQ4 = 40u;   /* K = 2.5 (tighter spike rejection) */
     params.madEpsQ4  = 8u;    /* 0.5 dB floor */
 
-    params.enterNearQ4 = ProxRssi_DbmToQ4((sint8)-50);
-    params.exitNearQ4  = ProxRssi_DbmToQ4((sint8)-60);
-    params.hystQ4      = (uint16)ProxRssi_DbToQ4((sint16)10);
+    params.enterNearQ4 = ProxRssi_DbmToQ4((int8_t)-50);
+    params.exitNearQ4  = ProxRssi_DbmToQ4((int8_t)-60);
+    params.hystQ4      = (uint16_t)ProxRssi_DbToQ4((int16_t)10);
 
     params.pctThQ15       = 13107u;  /* ~40% of smoothed samples above enter */
     params.stdThQ4        = 128u;    /* 8 dB — realistic for BLE RSSI noise */
@@ -188,8 +189,8 @@ void RssiIntegration_UpdateRssi(uint8_t deviceId, int8_t rssi)
 
     nowMs = RssiIntegration_GetTimestampMs();
 
-    (void)ProxRssi_PushRaw(&gProxCtx, (uint32)nowMs, (sint8)rssi);
-    (void)ProxRssi_MainFunction(&gProxCtx, (uint32)nowMs, &ev, &feat);
+    (void)ProxRssi_PushRaw(&gProxCtx, nowMs, rssi);
+    (void)ProxRssi_MainFunction(&gProxCtx, nowMs, &ev, &feat);
 
     /* Track unlock */
     if (ev == PROX_RSSI_EVT_UNLOCK_TRIGGERED)
@@ -201,31 +202,20 @@ void RssiIntegration_UpdateRssi(uint8_t deviceId, int8_t rssi)
     gSampleCount++;
     if ((gSampleCount % RSSI_PRINT_INTERVAL) == 0u)
     {
-        RSSI_PRINT("[RSSI] R:");
+        RSSI_PRINT("[RSSI] Raw:");
         RSSI_PRINT((const char*)FORMAT_Dec2Str((uint32_t)(rssi < 0 ? (int32_t)(-rssi) : (int32_t)rssi)));
-        RSSI_PRINT(" EMA:");
+        RSSI_PRINT(" Avg:");
         {
-            sint16 ema = gProxCtx.emaQ4;
+            int16_t ema = gProxCtx.emaQ4;
             int32_t emaAbs = (ema < 0) ? (int32_t)(-ema) : (int32_t)ema;
             RSSI_PRINT((const char*)FORMAT_Dec2Str((uint32_t)(emaAbs / 16)));
             RSSI_PRINT(".");
             RSSI_PRINT((const char*)FORMAT_Dec2Str((uint32_t)((emaAbs % 16) * 10 / 16)));
         }
-        RSSI_PRINT(" SD:");
+        RSSI_PRINT(" StdDev:");
         RSSI_PRINT((const char*)FORMAT_Dec2Str((uint32_t)(feat.stdQ4 / 16u)));
         RSSI_PRINT(".");
         RSSI_PRINT((const char*)FORMAT_Dec2Str((uint32_t)((feat.stdQ4 % 16u) * 10u / 16u)));
-        RSSI_PRINT(" P:");
-        RSSI_PRINT((const char*)FORMAT_Dec2Str((uint32_t)((uint32_t)feat.pctAboveEnterQ15 * 100u / 32767u)));
-        RSSI_PRINT("% ST:");
-
-        switch (gProxCtx.st)
-        {
-            case PROX_RSSI_ST_FAR:       RSSI_PRINT("FAR");       break;
-            case PROX_RSSI_ST_CANDIDATE: RSSI_PRINT("CANDIDATE"); break;
-            case PROX_RSSI_ST_LOCKOUT:   RSSI_PRINT("LOCKOUT");   break;
-            default:                     RSSI_PRINT("?");          break;
-        }
         RSSI_PRINT("\r\n");
     }
 
@@ -373,13 +363,13 @@ static void RssiIntegration_BuildAlphaLut(void)
      * Gives ~1.3s time constant at 100ms sampling — smooth enough to
      * suppress BLE RSSI jitter while still tracking movement.
      * Q15: 0.05 = 1638, 0.30 = 9830 */
-    uint32 i;
+    uint32_t i;
     for (i = 0u; i < RSSI_ALPHA_LUT_LEN; i++)
     {
         /* alpha_q15 = 1638 + i * (9830 - 1638) / 1000 */
-        uint32 alpha = 1638u + ((i * 8192u) / 1000u);
+        uint32_t alpha = 1638u + ((i * 8192u) / 1000u);
         if (alpha > 32767u) { alpha = 32767u; }
-        gAlphaLutQ15[i] = (uint16)alpha;
+        gAlphaLutQ15[i] = (uint16_t)alpha;
     }
 }
 
@@ -398,4 +388,98 @@ static void RssiIntegration_TimerCallback(void *pParam)
     {
         (void)Gap_ReadRssi(gConnectedDeviceId);
     }
+}
+
+/*! *********************************************************************************
+* \brief     Get current RSSI EMA value (Q4 format)
+* \return    Current EMA RSSI in Q4 format (divide by 16 for dB)
+********************************************************************************** */
+int16_t RssiIntegration_GetEmaQ4(void)
+{
+    if (gRssiIntegrationInitialized != TRUE)
+    {
+        return 0;
+    }
+    return gProxCtx.emaQ4;
+}
+
+/*! *********************************************************************************
+* \brief     Get current RSSI standard deviation (Q4 format)
+* \return    Standard deviation in Q4 format
+********************************************************************************** */
+uint16_t RssiIntegration_GetStdQ4(void)
+{
+    /* Need to compute features to get current stats */
+    ProxRssi_EventType ev = PROX_RSSI_EVT_NONE;
+    ProxRssi_FeaturesType feat;
+    uint32_t nowMs;
+
+    if (gRssiIntegrationInitialized != TRUE)
+    {
+        return 0u;
+    }
+
+    nowMs = RssiIntegration_GetTimestampMs();
+    (void)ProxRssi_MainFunction(&gProxCtx, nowMs, &ev, &feat);
+    return feat.stdQ4;
+}
+
+/*! *********************************************************************************
+* \brief     Get percentage of samples above enter threshold (Q15 format)
+* \return    Percentage in Q15 format (0..32767 = 0%..100%)
+********************************************************************************** */
+uint16_t RssiIntegration_GetPctAboveEnterQ15(void)
+{
+    ProxRssi_EventType ev = PROX_RSSI_EVT_NONE;
+    ProxRssi_FeaturesType feat;
+    uint32_t nowMs;
+
+    if (gRssiIntegrationInitialized != TRUE)
+    {
+        return 0u;
+    }
+
+    nowMs = RssiIntegration_GetTimestampMs();
+    (void)ProxRssi_MainFunction(&gProxCtx, nowMs, &ev, &feat);
+    return feat.pctAboveEnterQ15;
+}
+
+/*! *********************************************************************************
+* \brief     Get current RSSI state name
+* \return    Pointer to state string ("FAR", "CANDIDATE", "LOCKOUT")
+********************************************************************************** */
+const char* RssiIntegration_GetStateName(void)
+{
+    if (gRssiIntegrationInitialized != TRUE)
+    {
+        return "UNINITIALIZED";
+    }
+
+    switch (gProxCtx.st)
+    {
+        case PROX_RSSI_ST_FAR:       return "FAR";
+        case PROX_RSSI_ST_CANDIDATE: return "CANDIDATE";
+        case PROX_RSSI_ST_LOCKOUT:   return "LOCKOUT";
+        default:                     return "UNKNOWN";
+    }
+}
+
+/*! *********************************************************************************
+* \brief     Get number of samples in feature window
+* \return    Sample count
+********************************************************************************** */
+uint16_t RssiIntegration_GetSampleCount(void)
+{
+    ProxRssi_EventType ev = PROX_RSSI_EVT_NONE;
+    ProxRssi_FeaturesType feat;
+    uint32_t nowMs;
+
+    if (gRssiIntegrationInitialized != TRUE)
+    {
+        return 0u;
+    }
+
+    nowMs = RssiIntegration_GetTimestampMs();
+    (void)ProxRssi_MainFunction(&gProxCtx, nowMs, &ev, &feat);
+    return feat.n;
 }
