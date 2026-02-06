@@ -2,7 +2,7 @@
 
 ## Overview
 
-BLE-based passive keyless entry for the **NXP KW47-LOC** board. A phone running a BLE app (e.g., nRF Connect) connects to the KW47 anchor. The anchor continuously reads the phone's RSSI, filters it through a 4-stage signal processing pipeline, and triggers an unlock when the phone is close and stable for 2 seconds. A 10 dB hysteresis band, 1.5-second exit confirmation timer, and 5-second post-unlock lockout prevent state flip-flopping.
+BLE-based passive keyless entry for the **NXP KW47-LOC** board. A phone connects to the KW47 anchor over BLE. The anchor continuously reads the phone's RSSI, filters it through a 4-stage signal processing pipeline, and triggers an unlock when the phone is close and stable for 2 seconds. A 10 dB hysteresis band, 1.5-second exit confirmation timer, and 5-second post-unlock lockout prevent state flip-flopping.
 
 All signal processing runs in **Q4 fixed-point** (1/16 dB resolution). No floating-point. No heap. MISRA C:2012 compliant.
 
@@ -11,8 +11,8 @@ All signal processing runs in **Q4 fixed-point** (1/16 dB resolution). No floati
 ## Architecture
 
 ```
-  iPhone / Phone                    PC Terminal
-  (nRF Connect)                    (screen 115200)
+  Phone (BLE)                       PC Terminal
+                                   (screen 115200)
        │                                │
        │  BLE Connection (RSSI)         │  Serial Diagnostics
        ▼                                ▼
@@ -69,7 +69,6 @@ All signal processing runs in **Q4 fixed-point** (1/16 dB resolution). No floati
 │  Proximity State Machine (proximity_state_machine.c) │
 │  Disconnected → Monitoring → Approach → Proximity    │
 │  → Unlock                                            │
-│  (Future: Channel Sounding ranging)                  │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -122,12 +121,7 @@ All defined in `rssi_filter.h`:
 
 ### 1. BLE (Phone to KW47)
 
-The KW47 runs as a **BLE Central** and connects to a phone acting as a peripheral (or vice versa depending on the Digital Key profile). Once connected, the anchor periodically reads the RSSI via `Gap_ReadRssi()`.
-
-**Phone setup:**
-- Install **nRF Connect** (iOS/Android) or any BLE peripheral app
-- Start advertising or look for the KW47's "Digital Key" advertisement
-- Once connected, the KW47 automatically starts RSSI monitoring
+The KW47 runs as a **BLE Central** and connects to a phone acting as a peripheral (or vice versa depending on the Digital Key profile). Once connected, the anchor periodically reads the RSSI via `Gap_ReadRssi()`. Once a BLE connection is established, the KW47 automatically starts RSSI monitoring.
 
 ### 2. Serial Console (PC to KW47)
 
@@ -248,11 +242,9 @@ screen /dev/tty.usbmodem* 115200
 
 ### 5. Connect a Phone
 
-1. Open nRF Connect on your phone
-2. Scan for BLE devices
-3. Connect to "Digital Key" advertisement
-4. Walk toward / away from the KW47-LOC board
-5. Watch state transitions on the serial console
+1. Establish a BLE connection with the KW47-LOC board
+2. Walk toward / away from the board
+3. Watch state transitions on the serial console
 
 ### 6. Run Unit Tests (Host)
 
@@ -310,16 +302,6 @@ digital_key_car_anchor_cs/
 - No runtime parameter tuning — all thresholds are compile-time `#define` constants.
 - Single-anchor only — no multi-anchor or multi-phone support yet.
 - Channel Sounding (CS) not yet integrated.
-
----
-
-## Future Work
-
-- **Distance calibration** — map RSSI to physical distance with log-distance path-loss model
-- **Channel Sounding** — enable `gAppBtcsClient_d` for PBR + RTT secure ranging
-- **Multi-anchor** — Blue Ravens multi-anchor coordination
-- **Accelerometer** — FXLS8964AF integration for motion detection
-- **Attack detection** — NADM (Normalized Attack Detector Metric)
 
 ---
 
