@@ -2,7 +2,7 @@
 
 ## Overview
 
-BLE-based passive keyless entry for the **NXP KW47-LOC** board. A phone connects to the KW47 anchor over BLE. The anchor continuously reads the phone's RSSI, filters it through a 4-stage signal processing pipeline, and triggers an unlock when the phone is close and stable for 2 seconds. A 10 dB hysteresis band, 1.5-second exit confirmation timer, and 5-second post-unlock lockout prevent state flip-flopping.
+BLE-based passive keyless entry for the **NXP KW47-LOC** board. A phone connects to the KW47 anchor over BLE. The anchor continuously reads the phone's RSSI, filters it through a 4-stage signal processing pipeline, and triggers an unlock when the phone is close and stable for 2 seconds. A 10 dB hysteresis band (-50 dBm unlock / -60 dBm lock), 1.5-second exit confirmation timer, and 5-second post-unlock lockout prevent state flip-flopping.
 
 All signal processing runs in **Q4 fixed-point** (1/16 dB resolution). No floating-point. No heap. MISRA C:2012 compliant.
 
@@ -95,12 +95,12 @@ The filter converts noisy BLE RSSI readings into a stable proximity state. See `
 |-------|---------|-----------------|
 | **IDLE** | No data yet | Power-on / reset |
 | **FAR** (Locked) | Phone is far away | First valid EMA, or exit confirmed |
-| **CANDIDATE** (Approach) | Phone may be close, checking stability | Filtered RSSI >= -60 dBm |
+| **CANDIDATE** (Approach) | Phone may be close, checking stability | Filtered RSSI >= -50 dBm |
 | **UNLOCKED** (Lockout) | Unlock fired, cooldown active | Stable in CANDIDATE for 2 s |
 
 **Anti-flip-flop protections:**
-- **Hysteresis** — 10 dB gap between enter (-60 dBm) and exit (-70 dBm)
-- **Exit confirmation** — signal must stay below -70 dBm for 1.5 s before locking
+- **Hysteresis** — 10 dB gap between enter (-50 dBm) and exit (-60 dBm)
+- **Exit confirmation** — signal must stay below -60 dBm for 1.5 s before locking
 - **Lockout** — 5 s cooldown after unlock prevents rapid re-lock
 
 ### Key Thresholds
@@ -108,8 +108,8 @@ The filter converts noisy BLE RSSI readings into a stable proximity state. See `
 All defined in `rssi_filter.h`:
 
 ```c
-#define RSSI_ENTER_NEAR_DBM   (-60)    // >= this to enter CANDIDATE
-#define RSSI_EXIT_NEAR_DBM    (-70)    // < this for 1.5s to lock
+#define RSSI_ENTER_NEAR_DBM   (-50)    // >= this to enter CANDIDATE
+#define RSSI_EXIT_NEAR_DBM    (-60)    // < this for 1.5s to lock
 #define RSSI_STABLE_MS        (2000U)  // Hold in CANDIDATE to unlock
 #define RSSI_EXIT_CONFIRM_MS  (1500U)  // Confirm exit duration
 #define RSSI_LOCKOUT_MS       (5000U)  // Post-unlock lockout
@@ -298,7 +298,7 @@ digital_key_car_anchor_cs/
 
 ## Known Limitations / Tech Debt
 
-- **RSSI has not been converted to distance and/or calibrated.** Current thresholds (-60 / -70 dBm) are empirical. A path-loss model with per-environment calibration is needed.
+- **RSSI has not been converted to distance and/or calibrated.** Current thresholds (-50 / -60 dBm) are empirical. A path-loss model with per-environment calibration is needed.
 - No runtime parameter tuning — all thresholds are compile-time `#define` constants.
 - Single-anchor only — no multi-anchor or multi-phone support yet.
 - Channel Sounding (CS) not yet integrated.

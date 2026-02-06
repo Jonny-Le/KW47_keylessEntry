@@ -83,7 +83,7 @@ Formula: `ema = ema + alpha × (sample - ema)`, all in Q4/Q15 fixed-point.
 
 Operates on the **smoothed ring buffer**. Computes over all samples within the last 2 seconds:
 - **Standard deviation** (Q4) — via integer square root of variance
-- **Percent above enter threshold** (Q15) — fraction of samples ≥ -60 dBm
+- **Percent above enter threshold** (Q15) — fraction of samples ≥ -50 dBm
 - **Min, Max, Mean** (Q4)
 
 These features feed the stability gate in the state machine.
@@ -99,9 +99,9 @@ These features feed the stability gate in the state machine.
                          ▼
           ┌───────────────────────────────┐
      ┌───►│         FAR (Locked)          │◄────────────┐
-     │    │    filtered < -60 dBm         │             │
+     │    │    filtered < -50 dBm         │             │
      │    └──────────────┬────────────────┘             │
-     │                   │ filtered ≥ -60 dBm           │
+     │                   │ filtered ≥ -50 dBm           │
      │                   │ + CandidateStarted event     │
      │                   ▼                              │
      │    ┌───────────────────────────────┐             │
@@ -109,7 +109,7 @@ These features feed the stability gate in the state machine.
      │    │                               │             │
      │    │  Stability gate:              │  exit confirm│
      │    │  • stdDev < 2.5 dB            │  (1.5s below │
-     │    │  • pctAbove ≥ 50%             │   -70 dBm)  │
+     │    │  • pctAbove ≥ 50%             │   -60 dBm)  │
      │    │  • hold for 2s                │             │
      │    └───────┬───────────────────────┘             │
      │            │ stable 2s                           │
@@ -125,17 +125,17 @@ These features feed the stability gate in the state machine.
 
 | Parameter | Value | Macro |
 |-----------|-------|-------|
-| Enter threshold (near) | -60 dBm | `RSSI_ENTER_NEAR_DBM` |
-| Exit threshold (far) | -70 dBm | `RSSI_EXIT_NEAR_DBM` |
+| Enter threshold (near) | -50 dBm | `RSSI_ENTER_NEAR_DBM` |
+| Exit threshold (far) | -60 dBm | `RSSI_EXIT_NEAR_DBM` |
 | Stability: max std dev | 2.5 dB (Q4 = 40) | `RSSI_STD_TH_Q4` |
 | Stability: min pct above | 50% (Q15 = 16384) | `RSSI_PCT_TH_Q15` |
 | Stability hold time | 2000 ms | `RSSI_STABLE_MS` |
 | Exit confirmation | 1500 ms | `RSSI_EXIT_CONFIRM_MS` |
 | Post-unlock lockout | 5000 ms | `RSSI_LOCKOUT_MS` |
 
-**Hysteresis**: The 10 dB gap between enter (-60) and exit (-70) prevents flip-flopping when the signal hovers near a single threshold.
+**Hysteresis**: The 10 dB gap between enter (-50) and exit (-60) prevents flip-flopping when the signal hovers near a single threshold.
 
-**Exit confirmation**: When in CANDIDATE, the signal must remain below -70 dBm for 1.5 continuous seconds before reverting to FAR. Brief dips are ignored.
+**Exit confirmation**: When in CANDIDATE, the signal must remain below -60 dBm for 1.5 continuous seconds before reverting to FAR. Brief dips are ignored.
 
 **Lockout**: After an unlock event, the state machine stays in UNLOCKED for 5 seconds regardless of signal changes. This prevents rapid lock/unlock cycling (e.g., when a user opens a car door and the signal briefly drops).
 
@@ -260,8 +260,8 @@ All tunable parameters are `#define` constants in `rssi_filter.h`. Here's what e
 
 | Macro | Default | Effect |
 |-------|---------|--------|
-| `RSSI_ENTER_NEAR_DBM` | -60 | RSSI must exceed this to enter CANDIDATE. **Raise** (e.g., -50) to require closer proximity. **Lower** (e.g., -70) for longer range. |
-| `RSSI_EXIT_NEAR_DBM` | -70 | RSSI must drop below this (for 1.5s) to re-lock. Must be lower than enter threshold. The gap between enter and exit is the **hysteresis band** — wider gap = less flip-flopping. |
+| `RSSI_ENTER_NEAR_DBM` | -50 dBm | RSSI must exceed this to enter CANDIDATE. **Lower** (e.g., -60) for longer range. **Raise** (e.g., -40) for shorter range. |
+| `RSSI_EXIT_NEAR_DBM` | -60 dBm | RSSI must drop below this (for 1.5s) to re-lock. Must be lower than enter threshold. The gap between enter and exit is the **hysteresis band** — wider gap = less flip-flopping. |
 
 ### Timing
 
@@ -298,14 +298,14 @@ All tunable parameters are `#define` constants in `rssi_filter.h`. Here's what e
 
 - **More responsive unlock** (faster, less safe): Lower `RSSI_STABLE_MS` to 1000, raise `RSSI_STD_TH_Q4` to 64
 - **More conservative unlock** (slower, safer): Raise `RSSI_STABLE_MS` to 3000, lower `RSSI_STD_TH_Q4` to 24, raise `RSSI_PCT_TH_Q15` to 24576
-- **Longer range**: Lower `RSSI_ENTER_NEAR_DBM` to -70, lower `RSSI_EXIT_NEAR_DBM` to -80
-- **Shorter range**: Raise `RSSI_ENTER_NEAR_DBM` to -50, raise `RSSI_EXIT_NEAR_DBM` to -60
+- **Longer range**: Lower `RSSI_ENTER_NEAR_DBM` to -60, lower `RSSI_EXIT_NEAR_DBM` to -70
+- **Shorter range**: Raise `RSSI_ENTER_NEAR_DBM` to -40, raise `RSSI_EXIT_NEAR_DBM` to -50
 
 ---
 
 ## Known Limitations / Tech Debt
 
-- **RSSI has not been converted to distance and/or calibrated yet.** The current thresholds (-60 dBm / -70 dBm) are empirical estimates. A proper path-loss model (e.g., log-distance with per-environment calibration) has not been implemented. The thresholds will need to be re-tuned after distance calibration.
+- **RSSI has not been converted to distance and/or calibrated yet.** The current thresholds (-50 dBm / -60 dBm) are empirical estimates. A proper path-loss model (e.g., log-distance with per-environment calibration) has not been implemented. The thresholds will need to be re-tuned after distance calibration.
 - Hampel sort buffer capacity is fixed at compile time (`RSSI_RAW_CAP = 32`).
 - No runtime parameter tuning — all thresholds are `#define` constants.
 - Test coverage does not include multi-anchor or multi-phone scenarios.

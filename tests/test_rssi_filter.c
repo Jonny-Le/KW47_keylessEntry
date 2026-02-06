@@ -477,7 +477,7 @@ static void test_idle_to_far(void)
 static void test_far_to_candidate(void)
 {
     gTestsTotal++;
-    tprintf("\n[TEST] FAR -> CANDIDATE when RSSI >= -60 dBm\n");
+    tprintf("\n[TEST] FAR -> CANDIDATE when RSSI >= -50 dBm\n");
 
     rssiFilter_t f;
     InitFresh(&f);
@@ -486,11 +486,11 @@ static void test_far_to_candidate(void)
     FeedSamples(&f, -80, 10);
     TEST_ASSERT(RssiFilter_GetState(&f) == RssiState_Locked_c, "Should start FAR");
 
-    /* Move close: -50 dBm (above -60 enter threshold) */
-    FeedSamples(&f, -50, 20);
+    /* Move close: -40 dBm (above -50 enter threshold) */
+    FeedSamples(&f, -40, 20);
 
     rssiState_t st = RssiFilter_GetState(&f);
-    tprintf("    State after -50 dBm x20: %s\n", StateStr(st));
+    tprintf("    State after -40 dBm x20: %s\n", StateStr(st));
     TEST_ASSERT(st == RssiState_Approach_c || st == RssiState_Unlocked_c,
                 "Should be CANDIDATE or LOCKOUT");
 
@@ -513,7 +513,7 @@ static void test_candidate_to_unlock(void)
     FeedSamples(&f, -80, 10);
 
     /* Strong stable signal at -45 dBm.
-     * Need ~10 samples for EMA to cross -60 enter threshold,
+     * Need ~10 samples for EMA to cross -50 enter threshold,
      * then 2s for smooth ring to flush old values,
      * then 2s of stability. Total ~50+ samples. */
     FeedSamples(&f, -45, 60);
@@ -543,8 +543,8 @@ static void test_candidate_exit_confirm(void)
     /* Bootstrap in FAR */
     FeedSamples(&f, -80, 10);
 
-    /* Enter CANDIDATE with -50 dBm (need enough samples for EMA convergence) */
-    FeedSamples(&f, -50, 20);
+    /* Enter CANDIDATE with -40 dBm (need enough samples for EMA convergence) */
+    FeedSamples(&f, -40, 20);
     rssiState_t stMid = RssiFilter_GetState(&f);
     tprintf("    State after approach: %s\n", StateStr(stMid));
 
@@ -574,8 +574,8 @@ static void test_exit_confirm_resets(void)
     /* Bootstrap in FAR */
     FeedSamples(&f, -80, 10);
 
-    /* Enter CANDIDATE (enough samples for EMA to converge above -60) */
-    FeedSamples(&f, -50, 20);
+    /* Enter CANDIDATE (enough samples for EMA to converge above -50) */
+    FeedSamples(&f, -40, 20);
     rssiState_t stBefore = RssiFilter_GetState(&f);
     tprintf("    State after approach: %s\n", StateStr(stBefore));
 
@@ -585,7 +585,7 @@ static void test_exit_confirm_resets(void)
     FeedSamples(&f, -85, 5);
 
     /* Signal recovers before confirmation could expire */
-    FeedSamples(&f, -50, 15);
+    FeedSamples(&f, -40, 15);
 
     rssiState_t st = RssiFilter_GetState(&f);
     tprintf("    State after brief dip + recovery: %s\n", StateStr(st));
@@ -662,13 +662,13 @@ static void test_no_flipflop_hysteresis(void)
     /* Bootstrap in FAR */
     FeedSamples(&f, -80, 10);
 
-    /* Feed values in the hysteresis band (-65 dBm, between -60 enter and -70 exit) */
-    FeedSamples(&f, -65, 40);
+    /* Feed values in the hysteresis band (-55 dBm, between -50 enter and -60 exit) */
+    FeedSamples(&f, -55, 40);
 
     rssiState_t st = RssiFilter_GetState(&f);
-    tprintf("    State at -65 dBm (in band): %s\n", StateStr(st));
+    tprintf("    State at -55 dBm (in band): %s\n", StateStr(st));
     TEST_ASSERT(st == RssiState_Locked_c,
-                "Should remain FAR (below -60 enter threshold)");
+                "Should remain FAR (below -50 enter threshold)");
 
     TEST_PASS("No flip-flop in hysteresis band");
 }
@@ -689,7 +689,7 @@ static void test_unstable_does_not_unlock(void)
     FeedSamples(&f, -80, 10);
 
     /* Very noisy signal above threshold: alternate -30 and -55 for 4 seconds
-     * Mean is above -60, but std dev should be high */
+     * Mean is above -50, but std dev should be high */
     for (int i = 0; i < 40; i++)
     {
         int8_t val = (i % 2 == 0) ? (int8_t)-30 : (int8_t)-55;
@@ -723,7 +723,7 @@ static void test_events_emitted(void)
     rssiEvent_t ev1 = RssiFilter_GetLastEvent(&f);
     tprintf("    After FAR: event=%s\n", EventStr(ev1));
 
-    /* FAR -> CANDIDATE: CandidateStarted (need enough for EMA to cross -60) */
+    /* FAR -> CANDIDATE: CandidateStarted (need enough for EMA to cross -50) */
     FeedSamples(&f, -45, 20);
     rssiEvent_t ev2 = RssiFilter_GetLastEvent(&f);
     tprintf("    After approach: event=%s, state=%s\n", EventStr(ev2), StateStr(RssiFilter_GetState(&f)));
