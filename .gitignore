@@ -1,0 +1,17 @@
+# Build artifacts
+build/
+freertos/build/
+*.o
+*.elf
+*.bin
+*.srec
+*.hex
+*.map
+
+# Test binary
+tests/test_rssi_filter
+tests/test_results.xml
+tests/test_results.log
+
+# OS
+.DS_Store
