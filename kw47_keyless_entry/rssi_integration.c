@@ -385,7 +385,9 @@ static void RssiIntegration_BuildAlphaLut(void)
 
 static uint32_t RssiIntegration_GetTimestampMs(void)
 {
-    return TM_GetTimestamp();
+    /* TM_GetTimestamp() returns MICROSECONDS (HAL uses COUNT_TO_USEC).
+     * ProxRssi expects milliseconds for all window/timer parameters. */
+    return (uint32_t)(TM_GetTimestamp() / 1000u);
 }
 
 static void RssiIntegration_TimerCallback(void *pParam)
