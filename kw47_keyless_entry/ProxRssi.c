@@ -185,9 +185,9 @@ static Std_ReturnType ProxRssi_CopySmoothWindowQ4(const ProxRssi_CtxType* Ctx,
                                                   uint16* outN, sint16* outLastQ4)
 {
   uint16 n = 0u;
-  sint16 last = 0;
+  sint16 last = (sint16)0;
 
-  if (Ctx->smooth.count == 0u) { *outN = 0u; *outLastQ4 = 0; return E_NOT_OK; }
+  if (Ctx->smooth.count == 0u) { *outN = 0u; *outLastQ4 = (sint16)0; return E_NOT_OK; }
 
   const uint32 minT = (ProxRssi_TimeDiff(nowMs, 0u) >= winMs) ? (nowMs - winMs) : 0u;
 
@@ -259,9 +259,9 @@ static uint16 ProxRssi_AlphaQ15FromDt(const ProxRssi_CtxType* Ctx, uint32 dtMs)
 
 static void ProxRssi_EmaUpdate(ProxRssi_CtxType* Ctx, uint32 nowMs, sint16 xQ4, sint16* outEmaQ4)
 {
-  if (Ctx->emaValid == false)
+  if (Ctx->emaValid == FALSE)
   {
-    Ctx->emaValid = true;
+    Ctx->emaValid = TRUE;
     Ctx->emaQ4 = xQ4;
     Ctx->emaPrevMs = nowMs;
     *outEmaQ4 = xQ4;
@@ -302,8 +302,8 @@ static Std_ReturnType ProxRssi_ComputeFeatures(ProxRssi_CtxType* Ctx, uint32 now
   if (r != E_OK) { return E_NOT_OK; }
 
   /* sum/sumsq in 64-bit for safety */
-  sint64 sumQ4 = 0;
-  sint64 sumSqQ8 = 0;
+  sint64 sumQ4 = (sint64)0;
+  sint64 sumSqQ8 = (sint64)0;
 
   sint16 mn = Ctx->tmpS[0];
   sint16 mx = Ctx->tmpS[0];
@@ -315,8 +315,8 @@ static Std_ReturnType ProxRssi_ComputeFeatures(ProxRssi_CtxType* Ctx, uint32 now
   for (i = 0u; i < n; i++)
   {
     const sint16 xQ4 = Ctx->tmpS[i];
-    sumQ4 += (sint64)xQ4;
-    sumSqQ8 += (sint64)xQ4 * (sint64)xQ4;
+    sumQ4  = sumQ4 + (sint64)xQ4;
+    sumSqQ8 = sumSqQ8 + ((sint64)xQ4 * (sint64)xQ4);
 
     if (xQ4 >= enterQ4) { cntAbove++; }
     if (xQ4 < mn) { mn = xQ4; }
@@ -329,7 +329,7 @@ static Std_ReturnType ProxRssi_ComputeFeatures(ProxRssi_CtxType* Ctx, uint32 now
   {
     const sint64 meanSqTerm = (sumQ4 * sumQ4) / (sint64)n;
     sint64 diff = sumSqQ8 - meanSqTerm;
-    if (diff < 0) { diff = 0; }
+    if (diff < (sint64)0) { diff = (sint64)0; }
     const uint32 varQ8 = (uint32)(diff / (sint64)(n - 1u));
     stdQ4 = ProxRssi_IsqrtU32(varQ8);
   }
@@ -343,9 +343,14 @@ static Std_ReturnType ProxRssi_ComputeFeatures(ProxRssi_CtxType* Ctx, uint32 now
   return E_OK;
 }
 
-static bool ProxRssi_IsStable(const ProxRssi_CtxType* Ctx, const ProxRssi_FeaturesType* f)
+static boolean ProxRssi_IsStable(const ProxRssi_CtxType* Ctx, const ProxRssi_FeaturesType* f)
 {
-  return ((f->pctAboveEnterQ15 >= Ctx->p.pctThQ15) && (f->stdQ4 <= Ctx->p.stdThQ4));
+  boolean result = FALSE;
+  if ((f->pctAboveEnterQ15 >= Ctx->p.pctThQ15) && (f->stdQ4 <= Ctx->p.stdThQ4))
+  {
+    result = TRUE;
+  }
+  return result;
 }
 
 /* State machine */
@@ -357,12 +362,6 @@ static ProxRssi_EventType ProxRssi_StateStep(ProxRssi_CtxType* Ctx, uint32 nowMs
 
   if (Ctx->st == PROX_RSSI_ST_LOCKOUT)
   {
-    if (ProxRssi_TimeDiff(nowMs, Ctx->tLockoutUntilMs) < 0x80000000u)
-    {
-      /* nowMs >= lockoutUntil ? Using unsigned wrap trick: if now - until has MSB=0 then now>=until */
-      if (nowMs >= Ctx->tLockoutUntilMs) { /* explicit for readability */ }
-    }
-
     if (nowMs < Ctx->tLockoutUntilMs) { return PROX_RSSI_EVT_NONE; }
 
     if (lastQ4 < exitQ4)
@@ -411,7 +410,7 @@ static ProxRssi_EventType ProxRssi_StateStep(ProxRssi_CtxType* Ctx, uint32 nowMs
     Ctx->tBelowExitStartMs = 0u;
   }
 
-  if (ProxRssi_IsStable(Ctx, f) == true)
+  if (ProxRssi_IsStable(Ctx, f) == TRUE)
   {
     if (ProxRssi_TimeDiff(nowMs, Ctx->tCandidateStartMs) >= Ctx->p.stableMs)
     {
@@ -439,9 +438,9 @@ Std_ReturnType ProxRssi_Init(ProxRssi_CtxType* Ctx,
 {
   uint32 i;
 
-  if ((Ctx == (ProxRssi_CtxType*)0) ||
-      (Params == (const ProxRssi_ParamsType*)0) ||
-      (AlphaQ15Lut == (const uint16*)0) ||
+  if ((Ctx == NULL_PTR) ||
+      (Params == NULL_PTR) ||
+      (AlphaQ15Lut == NULL_PTR) ||
       (AlphaLutLen == 0u))
   {
     return E_NOT_OK;
@@ -479,8 +478,8 @@ Std_ReturnType ProxRssi_Init(ProxRssi_CtxType* Ctx,
   Ctx->tBelowExitStartMs = 0u;
   Ctx->tLockoutUntilMs = 0u;
 
-  Ctx->emaValid = false;
-  Ctx->emaQ4 = 0;
+  Ctx->emaValid = FALSE;
+  Ctx->emaQ4 = (sint16)0;
   Ctx->emaPrevMs = 0u;
 
   Ctx->raw.head = 0u;
@@ -493,7 +492,7 @@ Std_ReturnType ProxRssi_Init(ProxRssi_CtxType* Ctx,
 
 Std_ReturnType ProxRssi_PushRaw(ProxRssi_CtxType* Ctx, uint32 tMs, sint8 rssiDbm)
 {
-  if (Ctx == (ProxRssi_CtxType*)0) { return E_NOT_OK; }
+  if (Ctx == NULL_PTR) { return E_NOT_OK; }
 
   /* clamp */
   if (rssiDbm < (sint8)-127) { rssiDbm = (sint8)-127; }
@@ -510,7 +509,7 @@ Std_ReturnType ProxRssi_MainFunction(ProxRssi_CtxType* Ctx, uint32 nowMs,
   ProxRssi_FeaturesType f;
   ProxRssi_EventType ev = PROX_RSSI_EVT_NONE;
 
-  if ((Ctx == (ProxRssi_CtxType*)0) || (Event == (ProxRssi_EventType*)0))
+  if ((Ctx == NULL_PTR) || (Event == NULL_PTR))
   {
     return E_NOT_OK;
   }
@@ -520,12 +519,12 @@ Std_ReturnType ProxRssi_MainFunction(ProxRssi_CtxType* Ctx, uint32 nowMs,
   ProxRssi_SmoothPrune(Ctx, nowMs, Ctx->p.wFeatMs);
 
   /* default features */
-  f.n = 0u; f.pctAboveEnterQ15 = 0u; f.stdQ4 = 0u; f.lastQ4 = 0; f.minQ4 = 0; f.maxQ4 = 0;
+  f.n = 0u; f.pctAboveEnterQ15 = 0u; f.stdQ4 = 0u; f.lastQ4 = (sint16)0; f.minQ4 = (sint16)0; f.maxQ4 = (sint16)0;
 
   if (Ctx->raw.count == 0u)
   {
     *Event = PROX_RSSI_EVT_NONE;
-    if (Features != (ProxRssi_FeaturesType*)0) { *Features = f; }
+    if (Features != NULL_PTR) { *Features = f; }
     return E_OK;
   }
 
@@ -534,7 +533,7 @@ Std_ReturnType ProxRssi_MainFunction(ProxRssi_CtxType* Ctx, uint32 nowMs,
   if (ProxRssi_HampelSpikeReject(Ctx, nowMs, &xQ4) != E_OK)
   {
     *Event = PROX_RSSI_EVT_NONE;
-    if (Features != (ProxRssi_FeaturesType*)0) { *Features = f; }
+    if (Features != NULL_PTR) { *Features = f; }
     return E_OK;
   }
 
@@ -553,21 +552,21 @@ Std_ReturnType ProxRssi_MainFunction(ProxRssi_CtxType* Ctx, uint32 nowMs,
   }
 
   *Event = ev;
-  if (Features != (ProxRssi_FeaturesType*)0) { *Features = f; }
+  if (Features != NULL_PTR) { *Features = f; }
   return E_OK;
 }
 
 Std_ReturnType ProxRssi_ForceFar(ProxRssi_CtxType* Ctx)
 {
-  if (Ctx == (ProxRssi_CtxType*)0) { return E_NOT_OK; }
+  if (Ctx == NULL_PTR) { return E_NOT_OK; }
 
   Ctx->st = PROX_RSSI_ST_FAR;
   Ctx->tCandidateStartMs = 0u;
   Ctx->tBelowExitStartMs = 0u;
   Ctx->tLockoutUntilMs = 0u;
 
-  Ctx->emaValid = false;
-  Ctx->emaQ4 = 0;
+  Ctx->emaValid = FALSE;
+  Ctx->emaQ4 = (sint16)0;
   Ctx->emaPrevMs = 0u;
 
   Ctx->raw.head = 0u;

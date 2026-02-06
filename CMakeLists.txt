@@ -41,6 +41,8 @@ mcux_add_source(
            # Proximity RSSI Filter + State Machine
            kw47_keyless_entry/ProxRssi.c
            kw47_keyless_entry/ProxRssi.h
+           kw47_keyless_entry/rssi_integration.c
+           kw47_keyless_entry/rssi_integration.h
            ../../examples/wireless_examples/bluetooth/digital_key_car_anchor_cs/readme.md
            ../../${board_root}/${board}/wireless_examples/bluetooth/digital_key_car_anchor_cs/example_board_readme.md
 )

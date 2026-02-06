@@ -40,9 +40,12 @@
 */
 
 #include <stdint.h>
-#include <stdbool.h>
 
-/* ---------------- AUTOSAR-like basic types (portable) ---------------- */
+/* ---------------- AUTOSAR-like basic types (portable) ----------------
+ * These short names (uint8, sint16, …) are NOT in NXP EmbeddedTypes.h,
+ * so we always typedef them here. TRUE/FALSE/boolean are guarded to
+ * coexist with EmbeddedTypes.h which defines them differently.
+ * -------------------------------------------------------------------- */
 typedef uint8_t  uint8;
 typedef int8_t   sint8;
 typedef uint16_t uint16;
@@ -51,9 +54,22 @@ typedef uint32_t uint32;
 typedef int32_t  sint32;
 typedef int64_t  sint64;
 
+typedef uint8    boolean;
+#ifndef TRUE
+#define TRUE       1
+#define FALSE      0
+#endif
+
+#ifndef E_OK
 typedef uint8 Std_ReturnType;
 #define E_OK       ((Std_ReturnType)0u)
 #define E_NOT_OK   ((Std_ReturnType)1u)
+#endif
+
+/* NULL pointer macro (MISRA Rule 11.4 compliant) */
+#ifndef NULL_PTR
+#define NULL_PTR   ((void*)0)
+#endif
 
 /* ---------------- Compile-time configuration ---------------- */
 #ifndef PROX_RSSI_RAW_CAP
@@ -68,23 +84,23 @@ typedef uint8 Std_ReturnType;
 #define PROX_RSSI_ALPHA_LUT_MAX_MS (1000u)
 #endif
 
-#define PROX_RSSI_Q4_SCALE          (16)
+#define PROX_RSSI_Q4_SCALE          ((sint16)16)
 #define PROX_RSSI_Q15_ONE           (32767u)
 
 /* ---------------- Public types ---------------- */
 typedef enum
 {
-  PROX_RSSI_ST_FAR = 0,
-  PROX_RSSI_ST_CANDIDATE,
-  PROX_RSSI_ST_LOCKOUT
+  PROX_RSSI_ST_FAR       = 0,
+  PROX_RSSI_ST_CANDIDATE = 1,
+  PROX_RSSI_ST_LOCKOUT   = 2
 } ProxRssi_StateType;
 
 typedef enum
 {
-  PROX_RSSI_EVT_NONE = 0,
-  PROX_RSSI_EVT_CANDIDATE_STARTED,
-  PROX_RSSI_EVT_UNLOCK_TRIGGERED,
-  PROX_RSSI_EVT_EXIT_TO_FAR
+  PROX_RSSI_EVT_NONE              = 0,
+  PROX_RSSI_EVT_CANDIDATE_STARTED = 1,
+  PROX_RSSI_EVT_UNLOCK_TRIGGERED  = 2,
+  PROX_RSSI_EVT_EXIT_TO_FAR       = 3
 } ProxRssi_EventType;
 
 typedef struct
@@ -129,6 +145,22 @@ typedef struct
 
 typedef struct
 {
+  uint32 tMs[PROX_RSSI_RAW_CAP];
+  sint8  rssiDbm[PROX_RSSI_RAW_CAP];
+  uint16 head;
+  uint16 count;
+} ProxRssi_RawBufType;
+
+typedef struct
+{
+  uint32 tMs[PROX_RSSI_SMOOTH_CAP];
+  sint16 rssiQ4[PROX_RSSI_SMOOTH_CAP];
+  uint16 head;
+  uint16 count;
+} ProxRssi_SmoothBufType;
+
+typedef struct
+{
   ProxRssi_ParamsType p;
   ProxRssi_StateType  st;
 
@@ -136,25 +168,12 @@ typedef struct
   uint32 tBelowExitStartMs;
   uint32 tLockoutUntilMs;
 
-  bool   emaValid;
+  boolean emaValid;
   sint16 emaQ4;
   uint32 emaPrevMs;
 
-  struct
-  {
-    uint32 tMs[PROX_RSSI_RAW_CAP];
-    sint8  rssiDbm[PROX_RSSI_RAW_CAP];
-    uint16 head;
-    uint16 count;
-  } raw;
-
-  struct
-  {
-    uint32 tMs[PROX_RSSI_SMOOTH_CAP];
-    sint16 rssiQ4[PROX_RSSI_SMOOTH_CAP];
-    uint16 head;
-    uint16 count;
-  } smooth;
+  ProxRssi_RawBufType    raw;
+  ProxRssi_SmoothBufType smooth;
 
   uint16 alphaQ15[PROX_RSSI_ALPHA_LUT_MAX_MS + 1u];
 

@@ -246,7 +246,7 @@ static void test_init_defaults(void)
     InitFresh(&ctx);
 
     TEST_ASSERT(ctx.st == PROX_RSSI_ST_FAR, "State = FAR after init");
-    TEST_ASSERT(ctx.emaValid == false, "EMA not valid");
+    TEST_ASSERT(ctx.emaValid == FALSE, "EMA not valid");
     TEST_ASSERT(ctx.raw.count == 0u, "Raw ring empty");
     TEST_ASSERT(ctx.smooth.count == 0u, "Smooth ring empty");
 
@@ -698,7 +698,7 @@ static void test_force_far(void)
     Std_ReturnType r = ProxRssi_ForceFar(&ctx);
     TEST_ASSERT(r == E_OK, "ForceFar returns E_OK");
     TEST_ASSERT(ctx.st == PROX_RSSI_ST_FAR, "State = FAR after ForceFar");
-    TEST_ASSERT(ctx.emaValid == false, "EMA reset");
+    TEST_ASSERT(ctx.emaValid == FALSE, "EMA reset");
     TEST_ASSERT(ctx.raw.count == 0u, "Raw ring cleared");
     TEST_ASSERT(ctx.smooth.count == 0u, "Smooth ring cleared");
 
