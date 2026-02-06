@@ -38,11 +38,9 @@ mcux_add_source(
            bluetooth/examples/digital_key_car_anchor_cs/digital_key_car_anchor_cs.h
            bluetooth/examples/digital_key_car_anchor_cs/shell_digital_key_car_anchor_cs.c
            bluetooth/examples/digital_key_car_anchor_cs/shell_digital_key_car_anchor_cs.h
-           # RSSI Filtering Implementation
-           kw47_keyless_entry/rssi_filter.c
-           kw47_keyless_entry/rssi_filter.h
-           kw47_keyless_entry/proximity_state_machine.c
-           kw47_keyless_entry/proximity_state_machine.h
+           # Proximity RSSI Filter + State Machine
+           kw47_keyless_entry/ProxRssi.c
+           kw47_keyless_entry/ProxRssi.h
            ../../examples/wireless_examples/bluetooth/digital_key_car_anchor_cs/readme.md
            ../../${board_root}/${board}/wireless_examples/bluetooth/digital_key_car_anchor_cs/example_board_readme.md
 )

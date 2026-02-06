@@ -1,10 +1,10 @@
-# RSSI Filtering Algorithm — KW47 Keyless Entry
+# ProxRssi — BLE RSSI Proximity Filter
 
 ## Overview
 
-The RSSI filter module (`rssi_filter.h` / `rssi_filter.c`) processes raw BLE Received Signal Strength Indicator (RSSI) readings from a connected phone and determines whether the device is close enough to trigger an unlock. The algorithm is designed for the **NXP KW47B42ZB7** (Cortex-M33) and follows **MISRA C:2012** / **AUTOSAR** coding guidelines.
+The `ProxRssi` module (`ProxRssi.h` / `ProxRssi.c`) processes raw BLE RSSI readings from a connected phone and determines whether the device is close enough to trigger an unlock. Designed for the **NXP KW47B42ZB7** (Cortex-M33), safety-first (automotive-friendly), speed second.
 
-All arithmetic uses **Q4 fixed-point** (1 LSB = 1/16 dB). No floating-point. No dynamic memory. Deterministic execution time.
+All arithmetic uses **Q4 fixed-point** (1 LSB = 1/16 dB). No floating-point. No dynamic memory. Deterministic execution time. AUTOSAR-style types (`uint8`, `sint16`, `Std_ReturnType`, etc.).
 
 ---
 
@@ -12,7 +12,7 @@ All arithmetic uses **Q4 fixed-point** (1 LSB = 1/16 dB). No floating-point. No 
 
 ```
 Raw RSSI (dBm)
-      │
+      │  ProxRssi_PushRaw()
       ▼
 ┌──────────────┐
 │  1. Hampel    │  Outlier rejection — median + MAD in a sliding time window
@@ -21,8 +21,8 @@ Raw RSSI (dBm)
        │ clean sample (Q4)
        ▼
 ┌──────────────┐
-│  2. Adaptive  │  Exponential Moving Average with time-adaptive alpha
-│     EMA       │  Fast alpha for stale samples, slow alpha for rapid bursts
+│  2. Adaptive  │  Exponential Moving Average with LUT-based alpha
+│     EMA       │  Alpha indexed by dt (ms), Q15 fixed-point
 └──────┬───────┘
        │ smoothed value (Q4)
        ▼
@@ -30,7 +30,7 @@ Raw RSSI (dBm)
 │  3. Feature   │  Over a 2-second sliding window of smoothed values:
 │  Extraction   │  • Standard deviation (Q4)
 │               │  • Percent of samples above enter threshold (Q15)
-│               │  • Min / Max / Mean
+│               │  • Min / Max
 └──────┬───────┘
        │ features
        ▼
@@ -38,9 +38,9 @@ Raw RSSI (dBm)
 │  4. State     │  Proximity state machine with hysteresis,
 │  Machine      │  exit confirmation timer, and post-unlock lockout
 └──────────────┘
-       │
+       │  ProxRssi_MainFunction() returns:
        ▼
-  State + Event
+  ProxRssi_EventType + ProxRssi_FeaturesType
 ```
 
 ---
@@ -49,136 +49,136 @@ Raw RSSI (dBm)
 
 ### Stage 1: Hampel Filter (Outlier Rejection)
 
-| Parameter | Value | Macro |
-|-----------|-------|-------|
-| Time window | 800 ms | `RSSI_HAMPEL_WIN_MS` |
-| Threshold multiplier K | 3.0 (Q4 = 48) | `RSSI_HAMPEL_K_Q4` |
-| MAD floor | 0.5 dB (Q4 = 8) | `RSSI_MAD_EPS_Q4` |
+| Parameter | Field | Default |
+|-----------|-------|---------|
+| Spike window | `wSpikeMs` | 800 ms |
+| Threshold multiplier K | `hampelKQ4` | 48 (K=3.0) |
+| MAD floor | `madEpsQ4` | 8 (0.5 dB) |
 
-Collects raw samples within the time window, computes the **median** and **Median Absolute Deviation (MAD)** via insertion sort on a scratch buffer. If the new sample deviates from the median by more than `K × 1.4826 × MAD`, it is replaced with the median.
+Collects raw samples within the time window, computes the **median** and **Median Absolute Deviation (MAD)** via insertion sort on a scratch buffer. If the latest sample deviates from the median by more than `K × 1.5 × MAD`, it is replaced with the median.
 
 The MAD floor prevents the filter from becoming overly sensitive when the signal is perfectly stable (MAD ≈ 0).
 
 ### Stage 2: Adaptive EMA (Smoothing)
 
-| Parameter | Value | Macro |
-|-----------|-------|-------|
-| Alpha min (dt ≤ 50 ms) | ~0.10 (Q15 = 3277) | `RSSI_EMA_ALPHA_MIN_Q15` |
-| Alpha max (dt ≥ 500 ms) | ~0.80 (Q15 = 26214) | `RSSI_EMA_ALPHA_MAX_Q15` |
-| Anomaly threshold | 2000 ms | `RSSI_EMA_ANOMALY_DT_MS` |
+| Parameter | Field | Default |
+|-----------|-------|---------|
+| Alpha LUT | `alphaQ15[]` | Caller-provided, indexed by dt (ms) |
+| Anomaly threshold | `maxReasonableDtMs` | 2000 ms |
 
-Alpha is linearly interpolated between min and max based on the time delta between samples:
+Alpha is looked up from a caller-provided LUT indexed by the time delta (ms) between samples:
 - **Short dt** (rapid bursts) → low alpha → heavy smoothing
 - **Long dt** (stale data) → high alpha → fast adaptation
-- **dt > 2 s** → full EMA reset to the new sample (anomaly recovery)
+- **dt > maxReasonableDtMs** → full EMA reset (anomaly recovery)
 
 Formula: `ema = ema + alpha × (sample - ema)`, all in Q4/Q15 fixed-point.
 
 ### Stage 3: Feature Extraction
 
-| Parameter | Value | Macro |
-|-----------|-------|-------|
-| Statistics window | 2000 ms | `RSSI_FEAT_WIN_MS` |
-| Minimum samples | 6 | `RSSI_MIN_FEAT_SAMPLES` |
+| Parameter | Field | Default |
+|-----------|-------|---------|
+| Statistics window | `wFeatMs` | 2000 ms |
+| Minimum samples | `minFeatSamples` | 6 |
 
-Operates on the **smoothed ring buffer**. Computes over all samples within the last 2 seconds:
-- **Standard deviation** (Q4) — via integer square root of variance
-- **Percent above enter threshold** (Q15) — fraction of samples ≥ -50 dBm
-- **Min, Max, Mean** (Q4)
-
-These features feed the stability gate in the state machine.
+Operates on the **smoothed ring buffer**. Computes over all samples within the window:
+- **Standard deviation** (Q4) — via integer square root of variance (64-bit intermediate)
+- **Percent above enter threshold** (Q15)
+- **Min, Max, Last** (Q4)
 
 ### Stage 4: State Machine
 
 ```
           ┌───────────────────────────────┐
-          │            IDLE               │
-          │     (no signal received)      │
-          └──────────────┬────────────────┘
-                         │ first valid EMA
-                         ▼
-          ┌───────────────────────────────┐
-     ┌───►│         FAR (Locked)          │◄────────────┐
-     │    │    filtered < -50 dBm         │             │
+     ┌───►│            FAR                │◄────────────┐
+     │    │    filtered < enterNearQ4     │             │
      │    └──────────────┬────────────────┘             │
-     │                   │ filtered ≥ -50 dBm           │
-     │                   │ + CandidateStarted event     │
+     │                   │ filtered ≥ enterNearQ4       │
+     │                   │ + CANDIDATE_STARTED event    │
      │                   ▼                              │
      │    ┌───────────────────────────────┐             │
-     │    │      CANDIDATE (Approach)     │             │
-     │    │                               │             │
-     │    │  Stability gate:              │  exit confirm│
-     │    │  • stdDev < 2.5 dB            │  (1.5s below │
-     │    │  • pctAbove ≥ 50%             │   -60 dBm)  │
-     │    │  • hold for 2s                │             │
+     │    │         CANDIDATE             │             │
+     │    │                               │  exit confirm│
+     │    │  Stability gate:              │  (1.5s below │
+     │    │  • pctAbove ≥ pctThQ15        │  exitNearQ4) │
+     │    │  • stdDev ≤ stdThQ4           │             │
+     │    │  • hold for stableMs          │             │
      │    └───────┬───────────────────────┘             │
-     │            │ stable 2s                           │
-     │            │ + UnlockTriggered event              │
+     │            │ stable                              │
+     │            │ + UNLOCK_TRIGGERED event             │
      │            ▼                                     │
      │    ┌───────────────────────────────┐             │
-     │    │     UNLOCKED (Lockout)        │─────────────┘
-     │    │                               │  after 5s lockout
-     │    │  5-second lockout period      │  + 1.5s exit confirm
-     │    │  prevents immediate re-lock   │
+     │    │         LOCKOUT               │─────────────┘
+     │    │                               │  after lockoutMs
+     │    │  Cooldown period              │  + exitConfirmMs
+     │    │  prevents immediate re-trigger│
      │    └───────────────────────────────┘
 ```
 
-| Parameter | Value | Macro |
-|-----------|-------|-------|
-| Enter threshold (near) | -50 dBm | `RSSI_ENTER_NEAR_DBM` |
-| Exit threshold (far) | -60 dBm | `RSSI_EXIT_NEAR_DBM` |
-| Stability: max std dev | 2.5 dB (Q4 = 40) | `RSSI_STD_TH_Q4` |
-| Stability: min pct above | 50% (Q15 = 16384) | `RSSI_PCT_TH_Q15` |
-| Stability hold time | 2000 ms | `RSSI_STABLE_MS` |
-| Exit confirmation | 1500 ms | `RSSI_EXIT_CONFIRM_MS` |
-| Post-unlock lockout | 5000 ms | `RSSI_LOCKOUT_MS` |
-
-**Hysteresis**: The 10 dB gap between enter (-50) and exit (-60) prevents flip-flopping when the signal hovers near a single threshold.
-
-**Exit confirmation**: When in CANDIDATE, the signal must remain below -60 dBm for 1.5 continuous seconds before reverting to FAR. Brief dips are ignored.
-
-**Lockout**: After an unlock event, the state machine stays in UNLOCKED for 5 seconds regardless of signal changes. This prevents rapid lock/unlock cycling (e.g., when a user opens a car door and the signal briefly drops).
+| Parameter | Field | Default |
+|-----------|-------|---------|
+| Enter threshold | `enterNearQ4` | -50 dBm (Q4 = -800) |
+| Exit threshold | `exitNearQ4` | -60 dBm (Q4 = -960) |
+| Hysteresis | `hystQ4` | 10 dB (Q4 = 160) |
+| Stability: max std dev | `stdThQ4` | 40 (2.5 dB) |
+| Stability: min pct above | `pctThQ15` | 16384 (~50%) |
+| Stability hold time | `stableMs` | 2000 ms |
+| Exit confirmation | `exitConfirmMs` | 1500 ms |
+| Post-unlock lockout | `lockoutMs` | 5000 ms |
 
 #### Events
 
 | Event | Trigger |
 |-------|---------|
-| `CandidateStarted` | FAR → CANDIDATE transition |
-| `UnlockTriggered` | CANDIDATE → UNLOCKED (stability confirmed) |
-| `ExitToFar` | CANDIDATE/UNLOCKED → FAR (exit confirmed) |
+| `PROX_RSSI_EVT_CANDIDATE_STARTED` | FAR → CANDIDATE transition |
+| `PROX_RSSI_EVT_UNLOCK_TRIGGERED` | CANDIDATE → LOCKOUT (stability confirmed) |
+| `PROX_RSSI_EVT_EXIT_TO_FAR` | CANDIDATE/LOCKOUT → FAR (exit confirmed) |
 
 ---
 
 ## API
 
 ```c
-void        RssiFilter_Init(rssiFilter_t *pFilter);
-void        RssiFilter_AddMeasurement(rssiFilter_t *pFilter, int8_t rssi);
-int8_t      RssiFilter_GetFilteredRssi(const rssiFilter_t *pFilter);
-rssiState_t RssiFilter_GetState(const rssiFilter_t *pFilter);
-bool_t      RssiFilter_HasStateChanged(rssiFilter_t *pFilter);
-void        RssiFilter_Reset(rssiFilter_t *pFilter);
-void        RssiFilter_GetFeatures(const rssiFilter_t *pFilter,
-                                   uint16_t *pStdQ4, uint8_t *pPctAbove, int8_t *pMean);
-rssiEvent_t RssiFilter_GetLastEvent(const rssiFilter_t *pFilter);
+/* Init: pass context, params struct, alpha LUT, and LUT length */
+Std_ReturnType ProxRssi_Init(ProxRssi_CtxType* Ctx,
+                             const ProxRssi_ParamsType* Params,
+                             const uint16* AlphaQ15Lut,
+                             uint32 AlphaLutLen);
+
+/* Push a raw RSSI sample (call from worker thread, not ISR) */
+Std_ReturnType ProxRssi_PushRaw(ProxRssi_CtxType* Ctx, uint32 tMs, sint8 rssiDbm);
+
+/* Run the full pipeline: prune, Hampel, EMA, features, state machine */
+Std_ReturnType ProxRssi_MainFunction(ProxRssi_CtxType* Ctx, uint32 nowMs,
+                                     ProxRssi_EventType* Event,
+                                     ProxRssi_FeaturesType* Features);
+
+/* Force state to FAR and clear all buffers */
+Std_ReturnType ProxRssi_ForceFar(ProxRssi_CtxType* Ctx);
+
+/* Helpers */
+sint16 ProxRssi_DbmToQ4(sint8 dbm);
+sint16 ProxRssi_DbToQ4(sint16 db);
 ```
 
-All functions are NULL-safe. `HasStateChanged` clears the flag on read (read-once semantics). `GetLastEvent` returns the last non-None event and persists until a new event fires.
+All functions are NULL-safe (return `E_NOT_OK`). `Features` pointer in `MainFunction` is optional (pass NULL to skip).
 
 ---
 
 ## Memory Layout
 
-The `rssiFilter_t` struct is fully self-contained with no heap allocations:
+The `ProxRssi_CtxType` struct is fully self-contained with no heap allocations:
 
 | Field | Size | Purpose |
 |-------|------|---------|
-| `raw` ring buffer | 32 entries × (4B time + 1B rssi) = ~160 B | Hampel input window |
-| `smooth` ring buffer | 40 entries × (4B time + 2B Q4) = ~240 B | Feature extraction window |
-| `tmpA`, `tmpB` scratch | 32 × 2B × 2 = 128 B | Hampel sort buffers |
-| `tmpS` scratch | 40 × 2B = 80 B | Feature extraction sort |
-| EMA + state machine | ~40 B | Scalars |
-| **Total** | **~650 bytes** | Stack-allocated, deterministic |
+| `raw` ring buffer | 128 entries × (4B time + 1B rssi) = ~640 B | Hampel input window |
+| `smooth` ring buffer | 128 entries × (4B time + 2B Q4) = ~768 B | Feature extraction window |
+| `tmpA`, `tmpB` scratch | 128 × 2B × 2 = 512 B | Hampel sort buffers |
+| `tmpS` scratch | 128 × 2B = 256 B | Feature extraction sort |
+| `alphaQ15` LUT | 1001 × 2B = ~2 KB | EMA alpha lookup |
+| EMA + state machine | ~32 B | Scalars |
+| **Total** | **~4.2 KB** | Stack-allocated, deterministic |
+
+Buffer capacities are configurable at compile time: `PROX_RSSI_RAW_CAP`, `PROX_RSSI_SMOOTH_CAP`, `PROX_RSSI_ALPHA_LUT_MAX_MS`.
 
 ---
 
@@ -186,130 +186,102 @@ The `rssiFilter_t` struct is fully self-contained with no heap allocations:
 
 ### Prerequisites
 
-Any C11-compatible compiler on the host machine (e.g., `cc`, `gcc`, `clang`). No embedded toolchain needed — tests mock all SDK dependencies.
+Any C11-compatible compiler on the host machine (e.g., `cc`, `gcc`, `clang`). No embedded toolchain or SDK dependencies needed — ProxRssi uses only `<stdint.h>` and `<stdbool.h>`.
 
 ### Compile
 
 ```bash
 cc -std=c11 -Wall -Wextra \
-   -I tests/mocks \
-   -I /path/to/digital_key_car_anchor_cs \
-   -o tests/test_rssi_filter \
-   tests/test_rssi_filter.c
-```
-
-Replace `/path/to/digital_key_car_anchor_cs` with the actual path to the directory containing `rssi_filter.h` and `rssi_filter.c`. For example:
-
-```bash
-cc -std=c11 -Wall -Wextra \
-   -I tests/mocks \
-   -I ~/mcuxpresso-sdk/mcuxsdk/middleware/wireless/bluetooth/examples/digital_key_car_anchor_cs \
-   -o tests/test_rssi_filter \
-   tests/test_rssi_filter.c
+   -I kw47_keyless_entry \
+   -o tests/test_prox_rssi \
+   tests/test_prox_rssi.c -lm
 ```
 
 ### Run
 
 ```bash
 # Console only
-./tests/test_rssi_filter
+./tests/test_prox_rssi
 
 # Console + log file
-./tests/test_rssi_filter --log tests/test_results.log
+./tests/test_prox_rssi --log tests/test_results.log
 
 # Console + JUnit XML (for CI)
-./tests/test_rssi_filter --xml tests/test_results.xml
+./tests/test_prox_rssi --xml tests/test_results.xml
 
 # Both
-./tests/test_rssi_filter --xml tests/test_results.xml --log tests/test_results.log
+./tests/test_prox_rssi --xml tests/test_results.xml --log tests/test_results.log
 ```
 
-### Mock Headers
-
-Located in `tests/mocks/`:
-
-| File | What it stubs |
-|------|---------------|
-| `EmbeddedTypes.h` | `bool_t`, `TRUE`/`FALSE`, `uint8_t`, etc. |
-| `fsl_component_timer_manager.h` | `TM_GetTimestamp()` — returns a mock clock controlled by `MockTimer_Set()` / `MockTimer_Advance()` |
-| `FunctionLib.h` | `FLib_MemSet()` — wraps `memset` |
-
-### Test Coverage (25 tests)
+### Test Coverage (19 tests)
 
 | Category | Tests |
 |----------|-------|
-| Init & Reset | 2 |
-| NULL safety | 1 |
+| Init & NULL safety | 2 |
+| PushRaw clamping | 1 |
 | Hampel filter | 2 |
-| EMA smoothing | 3 |
-| Feature extraction | 2 |
-| State transitions | 4 |
+| EMA smoothing | 2 |
+| Feature extraction | 1 |
+| State transitions | 2 |
 | Exit confirmation | 2 |
 | Lockout | 2 |
 | Hysteresis / stability | 2 |
-| Events & flags | 3 |
-| Edge cases | 2 |
+| ForceFar | 1 |
+| Full lifecycle | 1 |
+| Q4 conversions | 1 |
 
 ---
 
 ## Tuning Guide
 
-All tunable parameters are `#define` constants in `rssi_filter.h`. Here's what each one does and how to adjust it.
+All tunable parameters are fields of `ProxRssi_ParamsType`, passed at init time.
 
 ### Thresholds (most likely to need tuning)
 
-| Macro | Default | Effect |
+| Field | Default | Effect |
 |-------|---------|--------|
-| `RSSI_ENTER_NEAR_DBM` | -50 dBm | RSSI must exceed this to enter CANDIDATE. **Lower** (e.g., -60) for longer range. **Raise** (e.g., -40) for shorter range. |
-| `RSSI_EXIT_NEAR_DBM` | -60 dBm | RSSI must drop below this (for 1.5s) to re-lock. Must be lower than enter threshold. The gap between enter and exit is the **hysteresis band** — wider gap = less flip-flopping. |
+| `enterNearQ4` | -50 dBm | RSSI must exceed this to enter CANDIDATE. **Lower** for longer range. **Raise** for shorter range. |
+| `exitNearQ4` | -60 dBm | RSSI must drop below this (for `exitConfirmMs`) to re-lock. The gap between enter and exit is the **hysteresis band**. |
 
 ### Timing
 
-| Macro | Default | Effect |
+| Field | Default | Effect |
 |-------|---------|--------|
-| `RSSI_STABLE_MS` | 2000 ms | How long RSSI must be stable in CANDIDATE before unlock fires. **Increase** for more cautious unlocking. **Decrease** for faster response. |
-| `RSSI_EXIT_CONFIRM_MS` | 1500 ms | How long RSSI must stay below exit threshold before locking. Prevents brief signal dips from triggering lock. |
-| `RSSI_LOCKOUT_MS` | 5000 ms | Cooldown after unlock. Prevents rapid lock/unlock cycling. |
+| `stableMs` | 2000 ms | How long RSSI must be stable in CANDIDATE before unlock fires. |
+| `exitConfirmMs` | 1500 ms | How long RSSI must stay below exit threshold before locking. |
+| `lockoutMs` | 5000 ms | Cooldown after unlock. Prevents rapid re-triggering. |
 
 ### Stability Gate
 
-| Macro | Default | Effect |
+| Field | Default | Effect |
 |-------|---------|--------|
-| `RSSI_STD_TH_Q4` | 40 (2.5 dB) | Max allowed standard deviation for unlock. **Lower** = stricter stability requirement. |
-| `RSSI_PCT_TH_Q15` | 16384 (~50%) | Min fraction of samples above enter threshold. **Raise** toward 32767 (100%) for stricter. |
+| `stdThQ4` | 40 (2.5 dB) | Max allowed std dev for unlock. **Lower** = stricter. |
+| `pctThQ15` | 16384 (~50%) | Min fraction of samples above enter threshold. **Raise** for stricter. |
 
 ### Hampel Filter
 
-| Macro | Default | Effect |
+| Field | Default | Effect |
 |-------|---------|--------|
-| `RSSI_HAMPEL_WIN_MS` | 800 ms | Window for outlier detection. Wider = more robust but slower to adapt. |
-| `RSSI_HAMPEL_K_Q4` | 48 (K=3.0) | Outlier threshold multiplier. **Lower** = more aggressive spike rejection. **Higher** = more permissive. |
-| `RSSI_MAD_EPS_Q4` | 8 (0.5 dB) | MAD floor. Prevents over-sensitivity when signal is perfectly stable. |
-
-### EMA Smoothing
-
-| Macro | Default | Effect |
-|-------|---------|--------|
-| `RSSI_EMA_ALPHA_MIN_Q15` | 3277 (~0.10) | Alpha for rapid samples (dt ≤ 50 ms). Lower = heavier smoothing. |
-| `RSSI_EMA_ALPHA_MAX_Q15` | 26214 (~0.80) | Alpha for stale samples (dt ≥ 500 ms). Higher = faster adaptation. |
-| `RSSI_EMA_ANOMALY_DT_MS` | 2000 ms | If no sample for this long, EMA resets completely. |
+| `wSpikeMs` | 800 ms | Window for outlier detection. |
+| `hampelKQ4` | 48 (K=3.0) | Outlier threshold multiplier. **Lower** = more aggressive rejection. |
+| `madEpsQ4` | 8 (0.5 dB) | MAD floor. |
 
 ### Quick Recipes
 
-- **More responsive unlock** (faster, less safe): Lower `RSSI_STABLE_MS` to 1000, raise `RSSI_STD_TH_Q4` to 64
-- **More conservative unlock** (slower, safer): Raise `RSSI_STABLE_MS` to 3000, lower `RSSI_STD_TH_Q4` to 24, raise `RSSI_PCT_TH_Q15` to 24576
-- **Longer range**: Lower `RSSI_ENTER_NEAR_DBM` to -60, lower `RSSI_EXIT_NEAR_DBM` to -70
-- **Shorter range**: Raise `RSSI_ENTER_NEAR_DBM` to -40, raise `RSSI_EXIT_NEAR_DBM` to -50
+- **More responsive unlock**: Lower `stableMs` to 1000, raise `stdThQ4` to 64
+- **More conservative unlock**: Raise `stableMs` to 3000, lower `stdThQ4` to 24, raise `pctThQ15` to 24576
+- **Longer range**: Lower `enterNearQ4` to `ProxRssi_DbmToQ4(-60)`, lower `exitNearQ4` accordingly
+- **Shorter range**: Raise `enterNearQ4` to `ProxRssi_DbmToQ4(-40)`
 
 ---
 
 ## Known Limitations / Tech Debt
 
-- **RSSI has not been converted to distance and/or calibrated yet.** The current thresholds (-50 dBm / -60 dBm) are empirical estimates. A proper path-loss model (e.g., log-distance with per-environment calibration) has not been implemented. The thresholds will need to be re-tuned after distance calibration.
-- Hampel sort buffer capacity is fixed at compile time (`RSSI_RAW_CAP = 32`).
-- No runtime parameter tuning — all thresholds are `#define` constants.
-- Test coverage does not include multi-anchor or multi-phone scenarios.
-- No power management optimization (filter runs on every sample regardless of state).
+- **RSSI has not been converted to distance and/or calibrated yet.** Current thresholds are empirical estimates.
+- Alpha LUT must be computed and passed by the caller at init time.
+- Buffer capacities are fixed at compile time.
+- No power management optimization (pipeline runs on every `MainFunction` call).
+- RSSI proximity must NOT be the sole unlock criterion — always run a secure cryptographic handshake.
 
 ---
 
@@ -317,8 +289,6 @@ All tunable parameters are `#define` constants in `rssi_filter.h`. Here's what e
 
 | File | Description |
 |------|-------------|
-| `rssi_filter.h` | Public API, types, all `#define` configuration |
-| `rssi_filter.c` | Full pipeline implementation (~460 lines) |
-| `rssi_integration.c` | Glue between BLE stack callbacks and filter module |
-| `tests/test_rssi_filter.c` | 25 unit tests with JUnit XML + log output |
-| `tests/mocks/` | Mock headers for host-side compilation |
+| `kw47_keyless_entry/ProxRssi.h` | Public API, types, params struct, compile-time config |
+| `kw47_keyless_entry/ProxRssi.c` | Full pipeline implementation (~580 lines) |
+| `tests/test_prox_rssi.c` | 19 unit tests with JUnit XML + log output |

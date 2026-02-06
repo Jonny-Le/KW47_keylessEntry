@@ -15,3 +15,4 @@ tests/test_results.log
 
 # OS
 .DS_Store
+tests/test_prox_rssi

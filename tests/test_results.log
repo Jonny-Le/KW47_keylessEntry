@@ -1,60 +1,48 @@
 
 ================================================================
-  RSSI Filter Unit Tests (Q4 Pipeline + Exit Confirm + Lockout)
+  ProxRssi Unit Tests (Hampel + EMA + Features + State Machine)
 ================================================================
 
 [TEST] Init defaults
   PASS: Init defaults
 
-[TEST] Reset clears all state
-  PASS: Reset clears all state
+[TEST] Init NULL safety
+  PASS: Init NULL safety
 
-[TEST] NULL pointer safety
-  PASS: NULL pointer safety
+[TEST] PushRaw clamping
+  PASS: PushRaw clamping
 
 [TEST] Hampel rejects single spike
-    Before spike: -50 dBm, After spike: -50 dBm
+    EMA before: -800 Q4, after: -800 Q4, jump: 0 Q4 (0.0 dB)
   PASS: Hampel rejects single spike
 
 [TEST] Hampel passes clean signal
-    Filtered: -45 dBm (expected ~-45)
+    EMA: -720 Q4 (-45.0 dBm), expected: -720 Q4, diff: 0 Q4
   PASS: Hampel passes clean signal
 
 [TEST] EMA converges to stable input
-    Filtered after 30 samples of -55: -55 dBm
+    EMA after 30 samples of -55: -55.0 dBm (diff: 0.0 dB)
   PASS: EMA converges to stable input
 
-[TEST] EMA smooths noisy input
-    Filtered (alternating -45/-55): -51 dBm
-  PASS: EMA smooths noisy input
-
 [TEST] EMA resets on time anomaly (dt > 2s)
-    Before gap: -40, After gap+(-80 x10): -80
+    Before gap: -40.0 dBm, After gap+(-80 x10): -80.0 dBm
   PASS: EMA resets on time anomaly
 
 [TEST] Feature extraction: stable signal
-    StdDev(Q4)=0 (0.0 dB), PctAbove=100%, Mean=-50
+    StdDev(Q4)=0 (0.0 dB), PctAbove(Q15)=32767, n=21
   PASS: Feature extraction: stable signal
 
-[TEST] Feature extraction: noisy signal
-    StdDev(Q4)=23 (1.4 dB), PctAbove=100%, Mean=-52
-  PASS: Feature extraction: noisy signal
-
-[TEST] IDLE -> FAR after first valid sample
-    State after 5 samples at -80: FAR
-  PASS: IDLE -> FAR
-
-[TEST] FAR -> CANDIDATE when RSSI >= -60 dBm
-    State after -50 dBm x20: CANDIDATE
+[TEST] FAR -> CANDIDATE when RSSI >= enterNear
+    State: CANDIDATE, Last event: CANDIDATE_STARTED
   PASS: FAR -> CANDIDATE
 
-[TEST] CANDIDATE -> UNLOCK after 2s stable
+[TEST] CANDIDATE -> LOCKOUT after 2s stable
     State: LOCKOUT, Event: UNLOCK_TRIGGERED
-  PASS: CANDIDATE -> UNLOCK after 2s stable
+  PASS: CANDIDATE -> LOCKOUT after 2s stable
 
 [TEST] CANDIDATE -> FAR (exit confirmation 1.5s)
     State after approach: CANDIDATE
-    State after -85 x25: FAR
+    State after -85 x30: FAR, event: EXIT_TO_FAR
   PASS: CANDIDATE -> FAR (exit confirmation)
 
 [TEST] Exit confirmation resets when signal recovers
@@ -63,51 +51,36 @@
   PASS: Exit confirmation resets on recovery
 
 [TEST] Lockout period (5s after unlock)
-    State 2s after unlock (still in lockout): LOCKOUT
+    State 2s after unlock: LOCKOUT
   PASS: Lockout period
 
 [TEST] Lockout expires, then locks if signal weak
-    State after lockout + exit confirm at -85: FAR
+    State after lockout + exit confirm: FAR, event: EXIT_TO_FAR
   PASS: Lockout expires, then locks
 
 [TEST] No flip-flop between thresholds
-    State at -65 dBm (in band): FAR
+    State at -55 dBm (in band): FAR
   PASS: No flip-flop in hysteresis band
 
-[TEST] Unstable signal in CANDIDATE does not unlock
-    State after 4s of noisy above-threshold: CANDIDATE
+[TEST] Unstable signal does not unlock
+    State after 4s noisy: CANDIDATE
   PASS: Unstable signal does not unlock
 
-[TEST] Events emitted correctly
-    After FAR: event=NONE
-    After approach: event=CANDIDATE_STARTED, state=CANDIDATE
-    After stable: event=UNLOCK_TRIGGERED, state=LOCKOUT
-  PASS: Events emitted correctly
-
-[TEST] HasStateChanged clears flag
-    First call: 1, Second call: 0
-  PASS: HasStateChanged clears flag
-
-[TEST] GetFeatures with NULL output pointers
-  PASS: GetFeatures with NULL output pointers
-
-[TEST] Invalid RSSI input clamping
-    Filtered after extreme inputs then -50 x10: -43
-  PASS: Invalid RSSI input clamping
+[TEST] ForceFar resets to FAR
+  PASS: ForceFar resets to FAR
 
 [TEST] Full lifecycle
     Step 1 (far):       FAR
-    Step 2 (approach):  LOCKOUT
+    Step 2 (unlock):    LOCKOUT
     Step 3 (lockout):   LOCKOUT
     Step 4 (lock):      FAR
     Step 5 (re-unlock): LOCKOUT
   PASS: Full lifecycle
 
-[TEST] Rapid samples (dt=10ms) still smooth correctly
-    Filtered after 50 rapid samples of -50: -50 dBm
-  PASS: Rapid samples
+[TEST] Q4 conversion helpers
+  PASS: Q4 conversion helpers
 
 ================================================================
-  Results: 25 passed, 0 failed (of 25)
+  Results: 19 passed, 0 failed, 19 total
 ================================================================
 
